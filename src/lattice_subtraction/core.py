@@ -76,34 +76,43 @@ class LatticeSubtractor:
         self._setup_backend()
     
     def _setup_backend(self) -> None:
-        """Setup computation backend (numpy or cupy)."""
-        if self.config.backend == "cupy":
+        """Setup computation backend (numpy or pytorch)."""
+        if self.config.backend == "pytorch":
             try:
-                import cupy as cp
-                self.xp = cp
-                self.use_gpu = True
+                import torch
+                if torch.cuda.is_available():
+                    self.device = torch.device('cuda')
+                    self.use_gpu = True
+                else:
+                    import warnings
+                    warnings.warn(
+                        "CUDA not available, falling back to CPU."
+                    )
+                    self.device = torch.device('cpu')
+                    self.use_gpu = False
             except ImportError:
                 import warnings
                 warnings.warn(
-                    "CuPy not available, falling back to NumPy. "
-                    "Install with: pip install cupy-cuda12x"
+                    "PyTorch not available, falling back to NumPy. "
+                    "Install with: conda install pytorch pytorch-cuda=13.0 -c pytorch -c nvidia"
                 )
-                self.xp = np
+                self.device = None
                 self.use_gpu = False
         else:
-            self.xp = np
+            self.device = None
             self.use_gpu = False
     
-    def _to_device(self, array: np.ndarray) -> "np.ndarray":
-        """Move array to GPU if using CuPy."""
-        if self.use_gpu:
-            return self.xp.asarray(array)
+    def _to_device(self, array: np.ndarray):
+        """Move array to GPU if using PyTorch."""
+        if self.use_gpu and self.device is not None:
+            import torch
+            return torch.from_numpy(array).to(self.device)
         return array
     
     def _to_numpy(self, array) -> np.ndarray:
         """Move array from GPU to CPU if needed."""
-        if self.use_gpu:
-            return self.xp.asnumpy(array)
+        if self.use_gpu and hasattr(array, 'cpu'):
+            return array.cpu().numpy()
         return array
     
     def process(
@@ -164,23 +173,23 @@ class LatticeSubtractor:
         
         This implements the algorithm from bg_push_by_rot.m.
         """
-        xp = self.xp
-        
         # Convert to float64 for processing precision
         img = self._to_device(image.astype(np.float64))
-        box_size = img.shape[0]
+        box_size = image.shape[0]
         
         # Step 1: Compute FFT and shift to center DC
         if self.use_gpu:
-            fft_img = xp.fft.fft2(img)
-            fft_shifted = xp.fft.fftshift(fft_img)
+            import torch
+            fft_img = torch.fft.fft2(img)
+            fft_shifted = torch.fft.fftshift(fft_img)
+            # Step 2: Compute log-power spectrum
+            power_spectrum = torch.abs(torch.log(torch.abs(fft_shifted) + 1e-10))
         else:
             from scipy import fft
             fft_img = fft.fft2(img)
             fft_shifted = fft.fftshift(fft_img)
-        
-        # Step 2: Compute log-power spectrum
-        power_spectrum = xp.abs(xp.log(xp.abs(fft_shifted) + 1e-10))
+            # Step 2: Compute log-power spectrum
+            power_spectrum = np.abs(np.log(np.abs(fft_shifted) + 1e-10))
         
         # Step 3: Background subtraction for peak detection
         # Move to numpy for scipy operations
@@ -201,11 +210,11 @@ class LatticeSubtractor:
         )
         
         # Move mask to device
-        mask_final = self._to_device(mask_final.astype(np.float64))
+        mask_final_dev = self._to_device(mask_final.astype(np.float64))
         
         # Step 6: Inpainting with local averaging
         # Keep unmasked FFT values
-        fft_keep = mask_final * fft_shifted
+        fft_keep = mask_final_dev * fft_shifted
         
         # Calculate shift distance (based on unit cell)
         shift_pixels = int(
@@ -213,38 +222,65 @@ class LatticeSubtractor:
         )
         shift_pixels = max(1, shift_pixels)  # Ensure at least 1 pixel shift
         
-        # Compute local average amplitude from unmasked regions
-        amplitude_keep = xp.abs(fft_keep)
-        
-        # Shift and average (inpainting)
-        shift_avg = (
-            xp.roll(amplitude_keep, shift_pixels, axis=0) +
-            xp.roll(amplitude_keep, -shift_pixels, axis=0) +
-            xp.roll(amplitude_keep, shift_pixels, axis=1) +
-            xp.roll(amplitude_keep, -shift_pixels, axis=1)
-        ) / 4.0
-        
-        # Step 7: Replace masked amplitudes, preserve phase
-        mask_remove = ~mask_final.astype(bool)
-        inpaint_amplitude = mask_remove * shift_avg
-        
-        # Get original phase at masked positions
-        original_phase = xp.angle(fft_shifted * mask_remove)
-        
-        # Reconstruct: keep + inpainted with original phase
-        fft_result = fft_keep + inpaint_amplitude * xp.exp(1j * original_phase)
-        
-        # Step 8: Inverse FFT
         if self.use_gpu:
-            fft_result = xp.fft.ifftshift(fft_result)
-            result = xp.fft.ifft2(fft_result)
+            import torch
+            # Compute local average amplitude from unmasked regions
+            amplitude_keep = torch.abs(fft_keep)
+            
+            # Shift and average (inpainting)
+            shift_avg = (
+                torch.roll(amplitude_keep, shift_pixels, dims=0) +
+                torch.roll(amplitude_keep, -shift_pixels, dims=0) +
+                torch.roll(amplitude_keep, shift_pixels, dims=1) +
+                torch.roll(amplitude_keep, -shift_pixels, dims=1)
+            ) / 4.0
+            
+            # Step 7: Replace masked amplitudes, preserve phase
+            mask_remove = ~mask_final_dev.bool()
+            inpaint_amplitude = mask_remove * shift_avg
+            
+            # Get original phase at masked positions
+            original_phase = torch.angle(fft_shifted * mask_remove)
+            
+            # Reconstruct: keep + inpainted with original phase
+            fft_result = fft_keep + inpaint_amplitude * torch.exp(1j * original_phase)
+            
+            # Step 8: Inverse FFT
+            fft_result = torch.fft.ifftshift(fft_result)
+            result = torch.fft.ifft2(fft_result)
+            
+            # Take real part
+            result = torch.real(result).float()
         else:
+            # NumPy/SciPy path
+            # Compute local average amplitude from unmasked regions
+            amplitude_keep = np.abs(fft_keep)
+            
+            # Shift and average (inpainting)
+            shift_avg = (
+                np.roll(amplitude_keep, shift_pixels, axis=0) +
+                np.roll(amplitude_keep, -shift_pixels, axis=0) +
+                np.roll(amplitude_keep, shift_pixels, axis=1) +
+                np.roll(amplitude_keep, -shift_pixels, axis=1)
+            ) / 4.0
+            
+            # Step 7: Replace masked amplitudes, preserve phase
+            mask_remove = ~mask_final_dev.astype(bool)
+            inpaint_amplitude = mask_remove * shift_avg
+            
+            # Get original phase at masked positions
+            original_phase = np.angle(fft_shifted * mask_remove)
+            
+            # Reconstruct: keep + inpainted with original phase
+            fft_result = fft_keep + inpaint_amplitude * np.exp(1j * original_phase)
+            
+            # Step 8: Inverse FFT
             from scipy import fft
             fft_result = fft.ifftshift(fft_result)
             result = fft.ifft2(fft_result)
-        
-        # Take real part
-        result = xp.real(result).astype(xp.float32)
+            
+            # Take real part
+            result = np.real(result).astype(np.float32)
         
         # Move results to numpy
         result_np = self._to_numpy(result)

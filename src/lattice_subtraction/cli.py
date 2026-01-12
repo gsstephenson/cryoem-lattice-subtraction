@@ -90,7 +90,7 @@ def main():
 @click.option(
     "--gpu/--no-gpu",
     default=False,
-    help="Use GPU acceleration (requires CuPy). Default: CPU",
+    help="Use GPU acceleration (requires PyTorch+CUDA). Default: CPU",
 )
 @click.option(
     "--diagnostics/--no-diagnostics",
@@ -140,7 +140,7 @@ def process(
             threshold=threshold,
             inside_radius_ang=inside_radius,
             outside_radius_ang=outside_radius,
-            backend="cupy" if gpu else "numpy",
+            backend="pytorch" if gpu else "numpy",
         )
     
     logger.info(f"Processing: {input_path}")

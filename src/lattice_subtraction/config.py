@@ -33,7 +33,7 @@ class Config:
         pad_output: If False, crop output to original size. Default: False
         unit_cell_ang: Crystal unit cell size in Angstroms for shift calculation.
                       Default: 116Å (nucleosome repeat)
-        backend: Computation backend - 'numpy' for CPU, 'cupy' for GPU. Default: 'numpy'
+        backend: Computation backend - 'numpy' for CPU, 'pytorch' for GPU. Default: 'numpy'
     """
     
     # Required parameter
@@ -56,7 +56,7 @@ class Config:
     unit_cell_ang: float = 116.0  # Nucleosome repeat distance
     
     # Computation backend
-    backend: Literal["numpy", "cupy"] = "numpy"
+    backend: Literal["numpy", "pytorch"] = "numpy"
     
     def __post_init__(self):
         """Validate and set auto-calculated parameters."""

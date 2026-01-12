@@ -15,4 +15,6 @@ dependencies:
   - pytest>=7.4
   - pip
   - pip:
-    - cupy-cuda12x  # Optional: for GPU acceleration (remove if no CUDA)
+    # PyTorch with CUDA 12.4 via pip (faster install)
+    - torch --index-url https://download.pytorch.org/whl/cu124
+    - torchvision --index-url https://download.pytorch.org/whl/cu124
