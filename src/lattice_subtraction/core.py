@@ -224,10 +224,12 @@ class LatticeSubtractor:
         
         if self.use_gpu:
             import torch
-            # Compute local average amplitude from unmasked regions
+            # Compute amplitude of kept FFT values (zeros where mask removes peaks)
+            # This matches MATLAB: abs_y2_A = abs(y2_A) where y2_A = mask_final .* y2
             amplitude_keep = torch.abs(fft_keep)
             
-            # Shift and average (inpainting)
+            # Shift and average (inpainting) - propagates good values into zero regions
+            # This matches MATLAB circshift averaging
             shift_avg = (
                 torch.roll(amplitude_keep, shift_pixels, dims=0) +
                 torch.roll(amplitude_keep, -shift_pixels, dims=0) +
@@ -235,14 +237,18 @@ class LatticeSubtractor:
                 torch.roll(amplitude_keep, -shift_pixels, dims=1)
             ) / 4.0
             
-            # Step 7: Replace masked amplitudes, preserve phase
+            # Step 7: Replace masked amplitudes, preserve ORIGINAL phase
+            # MATLAB: y2_B = ~mask_final .* shift_ave
+            # MATLAB: angle_y2_ori_B = angle(y .* ~mask_final)  <- uses ORIGINAL FFT phase
             mask_remove = ~mask_final_dev.bool()
-            inpaint_amplitude = mask_remove * shift_avg
+            inpaint_amplitude = mask_remove.float() * shift_avg
             
-            # Get original phase at masked positions
-            original_phase = torch.angle(fft_shifted * mask_remove)
+            # Get original phase at masked positions FROM ORIGINAL FFT (not fft_keep)
+            # This is critical - MATLAB uses: angle(y .* ~mask_final)
+            original_phase = torch.angle(fft_shifted * mask_remove.float())
             
             # Reconstruct: keep + inpainted with original phase
+            # MATLAB: y2 = y2_A + value_y2_B .* exp(i .* angle_y2_ori_B)
             fft_result = fft_keep + inpaint_amplitude * torch.exp(1j * original_phase)
             
             # Step 8: Inverse FFT
@@ -252,11 +258,11 @@ class LatticeSubtractor:
             # Take real part
             result = torch.real(result).float()
         else:
-            # NumPy/SciPy path
-            # Compute local average amplitude from unmasked regions
+            # NumPy/SciPy path - same algorithm as GPU
+            # Compute amplitude of kept FFT values (zeros where mask removes peaks)
             amplitude_keep = np.abs(fft_keep)
             
-            # Shift and average (inpainting)
+            # Shift and average (inpainting) - propagates good values into zero regions
             shift_avg = (
                 np.roll(amplitude_keep, shift_pixels, axis=0) +
                 np.roll(amplitude_keep, -shift_pixels, axis=0) +
@@ -264,12 +270,12 @@ class LatticeSubtractor:
                 np.roll(amplitude_keep, -shift_pixels, axis=1)
             ) / 4.0
             
-            # Step 7: Replace masked amplitudes, preserve phase
-            mask_remove = ~mask_final_dev.astype(bool)
-            inpaint_amplitude = mask_remove * shift_avg
+            # Step 7: Replace masked amplitudes, preserve ORIGINAL phase
+            mask_remove = ~mask_final.astype(bool)
+            inpaint_amplitude = mask_remove.astype(np.float64) * shift_avg
             
-            # Get original phase at masked positions
-            original_phase = np.angle(fft_shifted * mask_remove)
+            # Get original phase at masked positions FROM ORIGINAL FFT
+            original_phase = np.angle(fft_shifted * mask_remove.astype(np.float64))
             
             # Reconstruct: keep + inpainted with original phase
             fft_result = fft_keep + inpaint_amplitude * np.exp(1j * original_phase)

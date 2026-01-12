@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lattice-subtraction"
-version = "1.0.0"
+version = "1.1.0"
 description = "Lattice subtraction for cryo-EM micrographs - removes periodic crystal signals to reveal non-periodic features"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
+    {name = "G. Stephenson", email = "gsstephenson@colorado.edu"},
     {name = "Kasinath Lab", email = "kasinath.lab@colorado.edu"}
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -35,17 +36,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gpu = ["cupy-cuda12x"]
+gpu = ["torch>=2.0"]
 dev = ["pytest>=7.4", "pytest-cov", "black", "ruff", "mypy"]
-viz = ["matplotlib>=3.7", "napari>=0.4"]
+viz = ["matplotlib>=3.7"]
 
 [project.scripts]
 lattice-sub = "lattice_subtraction.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/kasinath-lab/lattice-subtraction"
-Documentation = "https://github.com/kasinath-lab/lattice-subtraction#readme"
-Repository = "https://github.com/kasinath-lab/lattice-subtraction"
+Homepage = "https://github.com/gsstephenson/cryoem-lattice-subtraction"
+Documentation = "https://github.com/gsstephenson/cryoem-lattice-subtraction#readme"
+Repository = "https://github.com/gsstephenson/cryoem-lattice-subtraction"
 
 [tool.setuptools.packages.find]
 where = ["src"]
