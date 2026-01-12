@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lattice-subtraction"
+version = "1.0.0"
+description = "Lattice subtraction for cryo-EM micrographs - removes periodic crystal signals to reveal non-periodic features"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Kasinath Lab", email = "kasinath.lab@colorado.edu"}
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+keywords = ["cryo-em", "electron-microscopy", "lattice-subtraction", "image-processing", "fft"]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "mrcfile>=1.4",
+    "pyyaml>=6.0",
+    "tqdm>=4.65",
+    "click>=8.1",
+    "scikit-image>=0.21",
+]
+
+[project.optional-dependencies]
+gpu = ["cupy-cuda12x"]
+dev = ["pytest>=7.4", "pytest-cov", "black", "ruff", "mypy"]
+viz = ["matplotlib>=3.7", "napari>=0.4"]
+
+[project.scripts]
+lattice-sub = "lattice_subtraction.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/kasinath-lab/lattice-subtraction"
+Documentation = "https://github.com/kasinath-lab/lattice-subtraction#readme"
+Repository = "https://github.com/kasinath-lab/lattice-subtraction"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true

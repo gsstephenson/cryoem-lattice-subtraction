@@ -1,0 +1,10 @@
+pixel_ang: 1.14
+inside_radius_ang: 90.0
+outside_radius_ang: 3.1
+threshold: 1.42
+expand_pixel: 10
+pad_origin_x: 200
+pad_origin_y: 200
+pad_output: false
+unit_cell_ang: 116.0
+backend: numpy

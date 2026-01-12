@@ -1,0 +1,71 @@
+# Lattice Subtraction - Example Configuration
+# 
+# This file contains all available configuration options.
+# Copy and modify for your specific dataset.
+
+# ============================================
+# REQUIRED: Detector/Pixel Size
+# ============================================
+
+# Pixel size in Angstroms (detector-dependent)
+# Examples: K3 = 0.56, Falcon = 1.14, K2 = 1.32
+pixel_ang: 0.56
+
+# ============================================
+# Peak Detection Parameters
+# ============================================
+
+# Threshold for peak detection on log-amplitude FFT
+# Higher values = more conservative (fewer peaks detected)
+# Typical range: 1.2 - 1.8
+threshold: 1.42
+
+# ============================================
+# Resolution Limits (in Angstroms)
+# ============================================
+
+# Inner resolution limit - FFT spots within this radius are PRESERVED
+# (protects low-frequency structural information)
+inside_radius_ang: 90
+
+# Outer resolution limit - spots beyond this are PRESERVED
+# Set to "auto" to calculate as: pixel_ang * 2 + 0.2
+# Or specify explicitly (must be > Nyquist limit)
+outside_radius_ang: auto
+
+# ============================================
+# Morphological Parameters
+# ============================================
+
+# Expansion radius for mask dilation around detected peaks
+# Larger values create smoother transitions but may remove more signal
+expand_pixel: 10
+
+# ============================================
+# Crystal Parameters
+# ============================================
+
+# Unit cell size in Angstroms for shift calculation
+# Used to determine inpainting shift distance
+# Default: 116 (nucleosome repeat distance)
+unit_cell_ang: 116
+
+# ============================================
+# Padding Options
+# ============================================
+
+# Padding offsets in pixels (for edge artifact reduction)
+# Use larger Y padding for K3 detector (1000 recommended)
+pad_origin_x: 200
+pad_origin_y: 200  # Use 1000 for K3
+
+# Whether to output padded image (false = crop to original size)
+pad_output: false
+
+# ============================================
+# Computation Backend
+# ============================================
+
+# Backend for FFT computation
+# Options: "numpy" (CPU) or "cupy" (GPU, requires CUDA)
+backend: numpy
