@@ -278,6 +278,12 @@ lattice-sub process input.mrc -o output.mrc --pixel-size 0.56 --no-gpu
 # Batch process a directory (8 parallel workers)
 lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56 -j 8
 
+# Batch process with automatic visualization generation
+lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56 --vis viz_dir/
+
+# Generate visualizations for existing processed files
+lattice-sub visualize input_dir/ output_dir/ viz_dir/
+
 # Create a configuration file
 lattice-sub init-config params.yaml --pixel-size 0.56
 ```
@@ -370,6 +376,22 @@ result = processor.process_directory(
 print(f"Processed {result.successful}/{result.total} files")
 ```
 
+### Command Line with Visualizations
+
+```bash
+# Process batch and generate comparison visualizations
+lattice-sub batch input_dir/ output_dir/ \
+    --pixel-size 0.56 \
+    --config gpu_config.yaml \
+    --vis visualizations/ \
+    -v
+```
+
+This creates side-by-side PNG images showing:
+- Original micrograph
+- Lattice-subtracted result
+- Difference image (removed lattice pattern)
+
 ### Numbered Sequences
 
 ```python
@@ -382,6 +404,50 @@ result = processor.process_numbered_sequence(
     zero_pad=4  # mic_0001.mrc, mic_0002.mrc, ...
 )
 ```
+
+---
+
+## Visualization
+
+Generate comparison visualizations to inspect lattice subtraction results.
+
+### Command Line
+
+```bash
+# Generate visualizations for existing processed files
+lattice-sub visualize input_dir/ output_dir/ viz_dir/
+
+# With custom options
+lattice-sub visualize input_dir/ output_dir/ viz_dir/ \
+    --prefix sub_ \
+    --dpi 200 \
+    -v
+```
+
+### Python API
+
+```python
+from lattice_subtraction import generate_visualizations
+from pathlib import Path
+
+# Generate comparison PNGs for all processed images
+successful, total = generate_visualizations(
+    input_dir=Path("raw_micrographs/"),
+    output_dir=Path("subtracted/"),
+    viz_dir=Path("visualizations/"),
+    prefix="sub_",
+    dpi=150,
+    show_progress=True,
+)
+print(f"Created {successful}/{total} visualizations")
+```
+
+### Output Format
+
+Each visualization shows three panels:
+1. **Original** - Input micrograph with lattice pattern
+2. **Lattice Subtracted** - Processed result with lattice removed
+3. **Difference** - Red/blue colormap showing the removed periodic pattern
 
 ---
 
@@ -478,14 +544,15 @@ pytest tests/ -v
 
 ```
 src/lattice_subtraction/
-├── __init__.py      # Package exports
-├── config.py        # Configuration dataclass
-├── core.py          # LatticeSubtractor main class
-├── batch.py         # Parallel batch processing
-├── cli.py           # Command-line interface
-├── io.py            # MRC file I/O
-├── masks.py         # Circular mask utilities
-└── processing.py    # FFT helpers, background subtraction
+├── __init__.py        # Package exports
+├── config.py          # Configuration dataclass
+├── core.py            # LatticeSubtractor main class
+├── batch.py           # Parallel batch processing
+├── cli.py             # Command-line interface
+├── io.py              # MRC file I/O
+├── masks.py           # Circular mask utilities
+├── processing.py      # FFT helpers, background subtraction
+└── visualization.py   # Comparison figure generation
 ```
 
 ## Citation

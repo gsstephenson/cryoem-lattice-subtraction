@@ -9,6 +9,7 @@ Main components:
     - LatticeSubtractor: Core class for processing single images
     - BatchProcessor: Parallel processing of multiple micrographs
     - Config: Configuration management via YAML files
+    - generate_visualizations: Create comparison PNG images
 
 Example:
     >>> from lattice_subtraction import LatticeSubtractor, Config
@@ -25,6 +26,11 @@ from .config import Config
 from .core import LatticeSubtractor
 from .batch import BatchProcessor
 from .io import read_mrc, write_mrc
+from .visualization import (
+    generate_visualizations,
+    save_comparison_visualization,
+    create_comparison_figure,
+)
 
 __all__ = [
     "LatticeSubtractor",
@@ -32,5 +38,8 @@ __all__ = [
     "Config",
     "read_mrc",
     "write_mrc",
+    "generate_visualizations",
+    "save_comparison_visualization",
+    "create_comparison_figure",
     "__version__",
 ]

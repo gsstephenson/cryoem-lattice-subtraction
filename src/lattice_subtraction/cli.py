@@ -15,6 +15,7 @@ import click
 from .config import Config, create_default_config
 from .core import LatticeSubtractor
 from .batch import BatchProcessor
+from .visualization import generate_visualizations, save_comparison_visualization
 
 
 # Setup logging
@@ -44,6 +45,12 @@ def main():
         
         # Batch process directory
         lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56 -j 8
+        
+        # Batch process with visualizations
+        lattice-sub batch input_dir/ output_dir/ -p 0.56 --vis viz_dir/
+        
+        # Generate visualizations for existing processed files
+        lattice-sub visualize input_dir/ output_dir/ viz_dir/
         
         # Create default config file
         lattice-sub init-config params.yaml --pixel-size 0.56
@@ -221,6 +228,12 @@ def process(
     help="Search subdirectories recursively",
 )
 @click.option(
+    "--vis",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Generate comparison visualizations in this directory",
+)
+@click.option(
     "-v", "--verbose",
     is_flag=True,
     help="Enable verbose output",
@@ -235,6 +248,7 @@ def batch(
     jobs: Optional[int],
     config: Optional[str],
     recursive: bool,
+    vis: Optional[str],
     verbose: bool,
 ):
     """
@@ -281,6 +295,19 @@ def batch(
             logger.warning(f"  ... and {len(result.failed_files) - 10} more")
         
         sys.exit(1)
+    
+    # Generate visualizations if requested
+    if vis:
+        logger.info(f"Generating visualizations in: {vis}")
+        viz_success, viz_total = generate_visualizations(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            viz_dir=vis,
+            prefix=prefix,
+            pattern=pattern,
+            show_progress=True,
+        )
+        logger.info(f"Visualizations: {viz_success}/{viz_total} created")
 
 
 @main.command("init-config")
@@ -329,6 +356,82 @@ def convert_config(input_file: str, output_file: str):
         click.echo(f"Converted {input_file} -> {output_file}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@main.command("visualize")
+@click.argument("input_dir", type=click.Path(exists=True, file_okay=False))
+@click.argument("output_dir", type=click.Path(exists=True, file_okay=False))
+@click.argument("viz_dir", type=click.Path(file_okay=False))
+@click.option(
+    "--prefix",
+    type=str,
+    default="sub_",
+    help="Prefix used for processed files. Default: sub_",
+)
+@click.option(
+    "--pattern",
+    type=str,
+    default="*.mrc",
+    help="Glob pattern for MRC files. Default: *.mrc",
+)
+@click.option(
+    "--dpi",
+    type=int,
+    default=150,
+    help="Resolution for output images. Default: 150",
+)
+@click.option(
+    "-v", "--verbose",
+    is_flag=True,
+    help="Enable verbose output",
+)
+def visualize(
+    input_dir: str,
+    output_dir: str,
+    viz_dir: str,
+    prefix: str,
+    pattern: str,
+    dpi: int,
+    verbose: bool,
+):
+    """
+    Generate comparison visualizations for processed micrographs.
+    
+    Creates side-by-side PNG images showing original, lattice-subtracted,
+    and difference images for each processed micrograph.
+    
+    \b
+    INPUT_DIR: Directory containing original MRC files
+    OUTPUT_DIR: Directory containing processed (sub_*) MRC files
+    VIZ_DIR: Directory for output visualization PNG files
+    
+    \b
+    Example:
+        lattice-sub visualize raw_images/ processed/ visualizations/
+    """
+    setup_logging(verbose)
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Generating visualizations...")
+    logger.info(f"  Original images: {input_dir}")
+    logger.info(f"  Processed images: {output_dir}")
+    logger.info(f"  Output visualizations: {viz_dir}")
+    
+    successful, total = generate_visualizations(
+        input_dir=Path(input_dir),
+        output_dir=Path(output_dir),
+        viz_dir=Path(viz_dir),
+        prefix=prefix,
+        pattern=pattern,
+        dpi=dpi,
+        show_progress=True,
+    )
+    
+    logger.info(f"Completed: {successful}/{total} visualizations created")
+    
+    if successful < total:
+        logger.warning(f"Some visualizations failed: {total - successful}")
         sys.exit(1)
 
 
