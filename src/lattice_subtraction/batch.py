@@ -168,6 +168,81 @@ class BatchProcessor:
         successful = 0
         failed_files = []
         
+        # Check if using GPU - if so, process sequentially to avoid CUDA fork issues
+        use_gpu = self.config.backend == "pytorch"
+        
+        if use_gpu:
+            # Sequential processing for GPU (CUDA doesn't support fork multiprocessing)
+            successful, failed_files = self._process_sequential(
+                file_pairs, show_progress
+            )
+        else:
+            # Parallel processing for CPU
+            successful, failed_files = self._process_parallel(
+                file_pairs, show_progress
+            )
+        
+        return BatchResult(
+            total=total,
+            successful=successful,
+            failed=total - successful,
+            failed_files=failed_files,
+        )
+    
+    def _process_sequential(
+        self,
+        file_pairs: List[Tuple[Path, Path]],
+        show_progress: bool = True,
+    ) -> Tuple[int, List[Tuple[Path, str]]]:
+        """Process files sequentially (for GPU mode)."""
+        import sys
+        successful = 0
+        failed_files = []
+        
+        # Create progress bar FIRST before any CUDA initialization
+        # Use sys.stdout and force flush for immediate display
+        if show_progress:
+            print("", flush=True)  # Ensure clean line
+            pbar = tqdm(
+                total=len(file_pairs),
+                desc="  Processing",
+                unit="file",
+                ncols=80,
+                leave=True,
+            )
+        else:
+            pbar = None
+        
+        # Now initialize subtractor (this triggers CUDA init)
+        subtractor = LatticeSubtractor(self.config)
+        
+        for input_path, output_path in file_pairs:
+            try:
+                result = subtractor.process(input_path)
+                result.save(output_path, pixel_size=self.config.pixel_ang)
+                successful += 1
+            except Exception as e:
+                failed_files.append((input_path, str(e)))
+                logger.error(f"Failed to process {input_path}: {e}")
+            
+            if pbar:
+                pbar.update(1)
+        
+        if pbar:
+            pbar.close()
+        
+        return successful, failed_files
+    
+    def _process_parallel(
+        self,
+        file_pairs: List[Tuple[Path, Path]],
+        show_progress: bool = True,
+    ) -> Tuple[int, List[Tuple[Path, str]]]:
+        """Process files in parallel (for CPU mode)."""
+        successful = 0
+        failed_files = []
+        total = len(file_pairs)
+        
         # Prepare arguments for parallel execution
         args_list = [
             (str(inp), str(out), self._config_dict)
@@ -200,12 +275,7 @@ class BatchProcessor:
                     failed_files.append((input_path, error))
                     logger.error(f"Failed to process {input_path}: {error}")
         
-        return BatchResult(
-            total=total,
-            successful=successful,
-            failed=total - successful,
-            failed_files=failed_files,
-        )
+        return successful, failed_files
     
     def process_numbered_sequence(
         self,

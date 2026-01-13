@@ -357,7 +357,7 @@ def batch(
         output_dir=output_dir,
         pattern=pattern,
         recursive=recursive,
-        show_progress=not ui.interactive,  # Use tqdm only when not interactive UI
+        show_progress=True,  # Always show progress bar
     )
     
     # Report results with UI
