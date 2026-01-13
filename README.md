@@ -1,5 +1,14 @@
 # Lattice Subtraction for Cryo-EM Micrographs
 
+```
+.__          __    __  .__                                   ___.    
+|  | _____ _/  |__/  |_|__| ____  ____             ________ _\_ |__  
+|  | \__  \\   __\   __\  |/ ___\/ __ \   ______  /  ___/  |  \ __ \ 
+|  |__/ __ \|  |  |  | |  \  \__\  ___/  /_____/  \___ \|  |  / \_\ \
+|____(____  /__|  |__| |__|\___  >___  >         /____  >____/|___  /
+          \/                   \/    \/               \/          \/ 
+```
+
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6+-ee4c2c.svg)](https://pytorch.org/)
 [![CUDA 12.4](https://img.shields.io/badge/CUDA-12.4-76B900.svg)](https://developer.nvidia.com/cuda-toolkit)
@@ -308,6 +317,39 @@ backend: pytorch    # "numpy" for CPU, "pytorch" for GPU
 lattice-sub process input.mrc -o output.mrc --config params.yaml
 ```
 
+### Terminal Interface
+
+When running interactively, `lattice-sub` displays a styled terminal interface with progress information:
+
+```
+.__          __    __  .__                                   ___.    
+|  | _____ _/  |__/  |_|__| ____  ____             ________ _\_ |__  
+|  | \__  \\   __\   __\  |/ ___\/ __ \   ______  /  ___/  |  \ __ \ 
+|  |__/ __ \|  |  |  | |  \  \__\  ___/  /_____/  \___ \|  |  / \_\ \
+|____(____  /__|  |__| |__|\___  >___  >         /____  >____/|___  /
+          \/                   \/    \/               \/          \/ 
+
+  Phase-preserving FFT inpainting for cryo-EM  |  v1.0.0
+
+  Configuration
+  -------------
+    Pixel size:  0.56 A
+    Threshold:   1.42
+    Backend:     PyTorch CUDA (NVIDIA GeForce RTX 3090)
+
+  > Processing: 18Dec27_SP_pos4_0411.mrc
+    |- Size: 4092 x 5760
+    `- [OK] Complete (3.45s)
+```
+
+**Pipeline mode**: When output is piped (e.g., `lattice-sub process ... | grep`), decorative output is automatically suppressed.
+
+**Quiet mode**: Use `--quiet` or `-q` to suppress decorative output even in interactive mode:
+
+```bash
+lattice-sub process input.mrc -o output.mrc -p 0.56 --quiet
+```
+
 ## Algorithm Details
 
 ### Processing Pipeline
@@ -555,6 +597,7 @@ src/lattice_subtraction/
 ├── io.py              # MRC file I/O
 ├── masks.py           # Circular mask utilities
 ├── processing.py      # FFT helpers, background subtraction
+├── ui.py              # Terminal UI with ASCII banner
 └── visualization.py   # Comparison figure generation
 ```
 

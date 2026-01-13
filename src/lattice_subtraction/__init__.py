@@ -31,6 +31,7 @@ from .visualization import (
     save_comparison_visualization,
     create_comparison_figure,
 )
+from .ui import TerminalUI, get_ui, is_interactive
 
 __all__ = [
     "LatticeSubtractor",
@@ -41,5 +42,8 @@ __all__ = [
     "generate_visualizations",
     "save_comparison_visualization",
     "create_comparison_figure",
+    "TerminalUI",
+    "get_ui",
+    "is_interactive",
     "__version__",
 ]
