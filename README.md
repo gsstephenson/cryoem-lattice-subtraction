@@ -7,6 +7,9 @@
 
 A Python package for computationally removing periodic crystal lattice signals (Bragg spots) from cryo-EM micrographs to reveal non-periodic features such as defects, individual particles, or molecular tags.
 
+![Example Lattice Subtraction Result](docs/images/example_comparison.png)
+*Example output: Original micrograph (left), lattice-subtracted result (center), and difference showing removed periodic pattern (right).*
+
 ## Overview
 
 When imaging 2D crystal samples in cryo-EM, the periodic lattice produces strong diffraction spots in Fourier space that can obscure weaker signals from non-periodic features. This package implements a **phase-preserving lattice subtraction algorithm** that:
