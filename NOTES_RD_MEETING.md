@@ -66,8 +66,19 @@ inside_radius_ang: 90
 backend: pytorch  # GPU acceleration
 ```
 
-### 6. Additional Improvements
-- Progress bars with tqdm
+### 6. Professional Terminal UI
+- ASCII art banner with styled output
+- Automatic TTY detection (interactive vs pipeline mode)
+- `--quiet` flag for scripted usage
+- Colored status messages
+
+### 7. Architecture Documentation
+- Mermaid.js flowcharts in `docs/architecture.md`
+- Processing pipeline, batch architecture, CLI structure
+- Module dependency graphs, sequence diagrams
+
+### 8. Additional Improvements
+- Progress bars with tqdm (immediate refresh)
 - Pip installable package
 - 12 unit tests with pytest
 - Cross-platform (Linux, macOS, Windows)
@@ -76,14 +87,12 @@ backend: pytorch  # GPU acceleration
 
 ## Benchmark Results (RTX 3090)
 
-| Workers | Time (100 images) | Speed | Status |
-|---------|-------------------|-------|--------|
-| 1 | 4m 34s | 2.74 s/image | ✅ Works |
-| **2** | **2m 29s** | **1.49 s/image** | ✅ **Optimal** |
-| 3 | - | - | ❌ OOM errors |
-| 4 | - | - | ❌ OOM errors |
+| Mode | Time (100 images) | Speed | Notes |
+|------|-------------------|-------|-------|
+| **GPU Sequential** | **5m 52s** | **3.52 s/image** | ✅ Stable, no OOM |
+| CPU Parallel (8 workers) | ~15m | ~9 s/image | ✅ Works on any hardware |
 
-**Note:** Each image is ~90MB (4092×5760 pixels). GPU memory usage is ~6GB per concurrent image.
+**Note:** GPU uses sequential processing to avoid CUDA multiprocessing issues. Each image is ~90MB (4092×5760 pixels), requiring ~6GB VRAM.
 
 ---
 
@@ -126,9 +135,22 @@ lattice-sub batch \
     --pixel-size 0.56 \
     --config /tmp/gpu_config.yaml \
     --vis /mnt/data_1/CU_Boulder/KASINATH/test_images/visualizations \
-    -j 1 \
     -v
+
+# Quiet mode for scripts (no ASCII banner)
+lattice-sub process input.mrc -o output.mrc -p 0.56 --gpu --quiet
 ```
+
+---
+
+## Architecture Diagrams
+
+See [`docs/architecture.md`](docs/architecture.md) for Mermaid.js diagrams showing:
+- **Processing Pipeline** - FFT → Peak Detection → Inpainting → Output
+- **Batch Processing** - Sequential GPU vs Parallel CPU modes
+- **CLI Structure** - Command hierarchy and options
+- **Module Dependencies** - Package architecture
+- **Sequence Diagram** - Step-by-step data flow
 
 ---
 
