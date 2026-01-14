@@ -11,6 +11,9 @@ from typing import Optional, Tuple
 
 import numpy as np
 
+# Silence matplotlib's verbose font debug logging
+logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
