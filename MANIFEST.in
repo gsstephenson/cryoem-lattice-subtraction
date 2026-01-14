@@ -1,0 +1,19 @@
+# Include essential files
+include LICENSE
+include README.md
+include pyproject.toml
+
+# Include source code
+recursive-include src *.py
+
+# Include examples and docs
+recursive-include examples *.yaml *.yml
+recursive-include docs *.md *.png
+
+# Exclude internal/development files
+exclude NOTES_*.md
+exclude *.log
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude *.egg-info
+global-exclude .git*

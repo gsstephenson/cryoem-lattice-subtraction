@@ -3,10 +3,19 @@ Mask generation utilities for FFT processing.
 
 This module provides functions for creating circular masks and 
 performing morphological operations on masks.
+
+GPU-accelerated versions are available when PyTorch with CUDA is present.
 """
 
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Optional, Union
+
+# Try to import torch for GPU operations
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 
 def create_circular_mask(
@@ -215,6 +224,173 @@ def create_fft_mask(
         rad_expand = expand_pixel // 2 - 1
         if rad_expand > 0:
             removal_regions = dilate_mask(removal_regions, rad_expand)
+        
+        mask_final = ~removal_regions
+    
+    return mask_final
+
+
+# =============================================================================
+# GPU-Accelerated Mask Functions
+# =============================================================================
+
+def create_circular_mask_gpu(
+    shape: Tuple[int, int],
+    radius: float,
+    center: Tuple[float, float] | None = None,
+    invert: bool = False,
+    device: Optional["torch.device"] = None,
+) -> "torch.Tensor":
+    """
+    Create a circular binary mask on GPU.
+    
+    GPU-accelerated version of create_circular_mask using PyTorch.
+    
+    Args:
+        shape: Output mask shape (height, width)
+        radius: Radius of the circular region in pixels
+        center: Center coordinates (y, x). If None, uses image center.
+        invert: If True, mask is 0 inside circle, 1 outside.
+        device: PyTorch device. If None, uses CUDA if available.
+        
+    Returns:
+        Boolean tensor on specified device
+    """
+    if not TORCH_AVAILABLE:
+        raise ImportError("PyTorch required for GPU mask operations")
+    
+    h, w = shape
+    
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    if center is None:
+        center = (h // 2, w // 2)
+    
+    cy, cx = center
+    
+    # Create coordinate grids on device
+    y = torch.arange(h, device=device, dtype=torch.float32).unsqueeze(1)
+    x = torch.arange(w, device=device, dtype=torch.float32).unsqueeze(0)
+    
+    # Calculate distance from center
+    dist_sq = (y - cy) ** 2 + (x - cx) ** 2
+    
+    # Create mask
+    mask = dist_sq < radius ** 2
+    
+    if invert:
+        mask = ~mask
+    
+    return mask
+
+
+def dilate_mask_gpu(
+    mask: "torch.Tensor",
+    radius: int,
+    device: Optional["torch.device"] = None,
+) -> "torch.Tensor":
+    """
+    Dilate a binary mask using max pooling on GPU.
+    
+    This is much faster than scipy.ndimage.binary_dilation for large masks.
+    Uses max pooling with a circular kernel approximation.
+    
+    Args:
+        mask: Input boolean tensor (H, W)
+        radius: Dilation radius in pixels
+        device: PyTorch device. If None, uses mask's device.
+        
+    Returns:
+        Dilated mask tensor
+    """
+    if not TORCH_AVAILABLE:
+        raise ImportError("PyTorch required for GPU mask operations")
+    
+    if device is None:
+        device = mask.device
+    
+    # Kernel size must be odd
+    kernel_size = radius * 2 + 1
+    padding = radius
+    
+    # Convert to float for max_pool2d (expects 4D: N, C, H, W)
+    mask_4d = mask.float().unsqueeze(0).unsqueeze(0)
+    
+    # Max pooling acts as dilation for binary masks
+    dilated = torch.nn.functional.max_pool2d(
+        mask_4d,
+        kernel_size=kernel_size,
+        stride=1,
+        padding=padding,
+    )
+    
+    # Convert back to boolean and remove batch/channel dims
+    return dilated.squeeze(0).squeeze(0) > 0.5
+
+
+def create_fft_mask_gpu(
+    box_size: int,
+    pixel_ang: float,
+    inside_radius_ang: float,
+    outside_radius_ang: float,
+    threshold_mask: "torch.Tensor",
+    expand_pixel: int = 10,
+    device: Optional["torch.device"] = None,
+) -> "torch.Tensor":
+    """
+    Create the composite FFT mask for lattice spot removal on GPU.
+    
+    GPU-accelerated version of create_fft_mask. All operations stay on GPU
+    to avoid CPU-GPU data transfers.
+    
+    Args:
+        box_size: Size of the FFT (square)
+        pixel_ang: Pixel size in Angstroms
+        inside_radius_ang: Inner resolution limit (protect center)
+        outside_radius_ang: Outer resolution limit (protect edges)
+        threshold_mask: Boolean tensor from peak thresholding (True = peak)
+        expand_pixel: Expansion radius for morphological dilation
+        device: PyTorch device. If None, uses threshold_mask's device.
+        
+    Returns:
+        Final mask tensor where True = keep, False = replace with inpainted values
+    """
+    if not TORCH_AVAILABLE:
+        raise ImportError("PyTorch required for GPU mask operations")
+    
+    if device is None:
+        device = threshold_mask.device
+    
+    # Convert resolution to Fourier pixels
+    inner_radius = resolution_to_pixels(inside_radius_ang, pixel_ang, box_size)
+    outer_radius = resolution_to_pixels(outside_radius_ang, pixel_ang, box_size)
+    
+    # Clamp outer radius to valid range
+    outer_radius = min(outer_radius, box_size // 2 - 1)
+    
+    # Create radial masks on GPU
+    shape = (box_size, box_size)
+    mask_center = create_circular_mask_gpu(shape, inner_radius, device=device)
+    mask_outside = create_circular_mask_gpu(shape, outer_radius, device=device)
+    
+    # Ensure threshold_mask is boolean tensor on correct device
+    if not isinstance(threshold_mask, torch.Tensor):
+        threshold_mask = torch.from_numpy(threshold_mask).to(device)
+    else:
+        threshold_mask = threshold_mask.to(device)
+    
+    # Combine masks (same logic as CPU version)
+    combined = ~threshold_mask | ~mask_outside | mask_center
+    mask_final = combined
+    
+    # Expand the removal regions
+    if expand_pixel > 0:
+        removal_regions = ~mask_final
+        
+        rad_expand = expand_pixel // 2 - 1
+        if rad_expand > 0:
+            removal_regions = dilate_mask_gpu(removal_regions, rad_expand, device=device)
         
         mask_final = ~removal_regions
     

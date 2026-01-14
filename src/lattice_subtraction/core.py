@@ -12,7 +12,7 @@ import numpy as np
 
 from .config import Config
 from .io import read_mrc, write_mrc
-from .masks import create_fft_mask, resolution_to_pixels
+from .masks import create_fft_mask, create_fft_mask_gpu, resolution_to_pixels
 from .processing import (
     pad_image,
     crop_to_original,
@@ -82,6 +82,7 @@ class LatticeSubtractor:
         Prints user-friendly status message about which backend is active.
         """
         backend = self.config.backend
+        self._gpu_message_shown = getattr(self, '_gpu_message_shown', False)
         
         # Auto mode: try GPU first, then CPU
         if backend == "auto":
@@ -90,16 +91,23 @@ class LatticeSubtractor:
                 if torch.cuda.is_available():
                     self.device = torch.device('cuda')
                     self.use_gpu = True
-                    gpu_name = torch.cuda.get_device_name(0)
-                    print(f"✓ Using GPU: {gpu_name}")
+                    # Only print once per session (batch processing reuses subtractor)
+                    if not self._gpu_message_shown:
+                        gpu_name = torch.cuda.get_device_name(0)
+                        print(f"✓ Using GPU: {gpu_name}")
+                        self._gpu_message_shown = True
                 else:
                     self.device = torch.device('cpu')
                     self.use_gpu = False
-                    print("ℹ Running on CPU (run 'lattice-sub setup-gpu' to enable GPU)")
+                    if not self._gpu_message_shown:
+                        print("ℹ Running on CPU (run 'lattice-sub setup-gpu' to enable GPU)")
+                        self._gpu_message_shown = True
             except ImportError:
                 self.device = None
                 self.use_gpu = False
-                print("ℹ Running on CPU with NumPy (PyTorch not installed)")
+                if not self._gpu_message_shown:
+                    print("ℹ Running on CPU with NumPy (PyTorch not installed)")
+                    self._gpu_message_shown = True
         
         elif backend == "pytorch":
             try:
@@ -225,17 +233,33 @@ class LatticeSubtractor:
         threshold_mask = subtracted > self.config.threshold
         
         # Step 5: Create composite mask with radial limits
-        mask_final = create_fft_mask(
-            box_size=box_size,
-            pixel_ang=self.config.pixel_ang,
-            inside_radius_ang=self.config.inside_radius_ang,
-            outside_radius_ang=self.config.outside_radius_ang,
-            threshold_mask=threshold_mask,
-            expand_pixel=self.config.expand_pixel,
-        )
-        
-        # Move mask to device
-        mask_final_dev = self._to_device(mask_final.astype(np.float64))
+        # Use GPU-accelerated mask creation when available
+        if self.use_gpu:
+            import torch
+            # Convert threshold mask to GPU tensor
+            threshold_tensor = torch.from_numpy(threshold_mask).to(self.device)
+            
+            # Create mask entirely on GPU
+            mask_final_dev = create_fft_mask_gpu(
+                box_size=box_size,
+                pixel_ang=self.config.pixel_ang,
+                inside_radius_ang=self.config.inside_radius_ang,
+                outside_radius_ang=self.config.outside_radius_ang,
+                threshold_mask=threshold_tensor,
+                expand_pixel=self.config.expand_pixel,
+                device=self.device,
+            ).float()
+        else:
+            # CPU path
+            mask_final = create_fft_mask(
+                box_size=box_size,
+                pixel_ang=self.config.pixel_ang,
+                inside_radius_ang=self.config.inside_radius_ang,
+                outside_radius_ang=self.config.outside_radius_ang,
+                threshold_mask=threshold_mask,
+                expand_pixel=self.config.expand_pixel,
+            )
+            mask_final_dev = self._to_device(mask_final.astype(np.float64))
         
         # Step 6: Inpainting with local averaging
         # Keep unmasked FFT values
@@ -315,8 +339,17 @@ class LatticeSubtractor:
         
         # Move results to numpy
         result_np = self._to_numpy(result)
-        mask_np = self._to_numpy(mask_final) if return_diagnostics else None
-        power_np = subtracted if return_diagnostics else None
+        
+        # For diagnostics, get mask as numpy array
+        if return_diagnostics:
+            if self.use_gpu:
+                mask_np = self._to_numpy(mask_final_dev).astype(bool)
+            else:
+                mask_np = mask_final.astype(bool)
+            power_np = subtracted
+        else:
+            mask_np = None
+            power_np = None
         
         return result_np, mask_np, power_np
     

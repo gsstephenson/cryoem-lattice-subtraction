@@ -7,4 +7,4 @@ pad_origin_x: 200
 pad_origin_y: 200
 pad_output: false
 unit_cell_ang: 116.0
-backend: numpy
+backend: auto

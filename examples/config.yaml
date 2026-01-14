@@ -67,5 +67,5 @@ pad_output: false
 # ============================================
 
 # Backend for FFT computation
-# Options: "numpy" (CPU) or "cupy" (GPU, requires CUDA)
-backend: numpy
+# Options: "auto" (default, GPU if available), "numpy" (CPU), or "pytorch" (GPU)
+backend: auto

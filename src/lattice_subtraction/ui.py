@@ -103,7 +103,16 @@ class TerminalUI:
         print(f"    Pixel size:  {self._colorize(f'{pixel_size} A', Colors.YELLOW)}")
         print(f"    Threshold:   {self._colorize(str(threshold), Colors.YELLOW)}")
         
-        if backend == "pytorch" and gpu_name:
+        # Determine backend display string
+        if backend == "auto":
+            # Check if GPU is actually available for auto mode
+            if gpu_name:
+                backend_str = f"Auto → GPU ({gpu_name})"
+                print(f"    Backend:     {self._colorize(backend_str, Colors.GREEN)}")
+            else:
+                backend_str = "Auto → CPU"
+                print(f"    Backend:     {self._colorize(backend_str, Colors.BLUE)}")
+        elif backend == "pytorch" and gpu_name:
             backend_str = f"PyTorch CUDA ({gpu_name})"
             print(f"    Backend:     {self._colorize(backend_str, Colors.GREEN)}")
         elif backend == "pytorch":

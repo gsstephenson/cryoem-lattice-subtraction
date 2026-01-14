@@ -4,23 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lattice-sub"
-version = "1.0.3"
+version = "1.0.7"
 description = "Lattice subtraction for cryo-EM micrographs - removes periodic crystal signals to reveal non-periodic features"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "G. Stephenson", email = "gsstephenson@colorado.edu"},
-    {name = "Kasinath Lab", email = "kasinath.lab@colorado.edu"}
+    {name = "George Stephenson", email = "george.stephenson@colorado.edu"},
+    {name = "Vignesh Kasinath", email = "vignesh.kasinath@colorado.edu"}
 ]
 requires-python = ">=3.11"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
@@ -34,6 +33,7 @@ dependencies = [
     "click>=8.1",
     "scikit-image>=0.21",
     "torch>=2.0",
+    "matplotlib>=3.7",
 ]
 
 [project.optional-dependencies]
@@ -50,6 +50,10 @@ Repository = "https://github.com/gsstephenson/cryoem-lattice-subtraction"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools]
+# Exclude internal notes and dev files from distribution
+exclude-package-data = {"*" = ["NOTES_*.md", "*.log", "*.sbatch"]}
 
 [tool.black]
 line-length = 100

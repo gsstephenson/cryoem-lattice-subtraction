@@ -19,8 +19,8 @@ Example:
     >>> result.save("output.mrc")
 """
 
-__version__ = "1.0.3"
-__author__ = "Kasinath Lab"
+__version__ = "1.0.7"
+__author__ = "George Stephenson & Vignesh Kasinath"
 
 from .config import Config
 from .core import LatticeSubtractor

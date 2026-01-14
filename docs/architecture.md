@@ -127,7 +127,7 @@ flowchart TB
         subgraph Options["Common Options"]
             PIXEL["-p, --pixel-size"]
             THRESH["-t, --threshold"]
-            GPU["--gpu"]
+            CPU["--cpu<br/>(GPU by default)"]
             QUIET["-q, --quiet"]
             VERBOSE["-v, --verbose"]
         end
@@ -135,7 +135,7 @@ flowchart TB
         PROCESS --> Options
         BATCH --> Options
         BATCH --> VIS_OPT["--vis<br/>Auto-visualize"]
-        BATCH --> WORKERS["-j, --workers"]
+        BATCH --> WORKERS["-j, --jobs"]
     end
 
     subgraph UI["🎨 Terminal UI"]
