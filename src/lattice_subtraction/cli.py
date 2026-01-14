@@ -123,7 +123,7 @@ def setup_logging(verbose: bool, interactive: bool = False) -> None:
 
 
 @click.group()
-@click.version_option(version="1.0.9", prog_name="lattice-sub")
+@click.version_option(version="1.0.10", prog_name="lattice-sub")
 def main():
     """
     Lattice Subtraction for Cryo-EM Micrographs.
