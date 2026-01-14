@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lattice-subtraction"
-version = "1.1.0"
+name = "lattice-sub"
+version = "1.0.3"
 description = "Lattice subtraction for cryo-EM micrographs - removes periodic crystal signals to reveal non-periodic features"
 readme = "README.md"
 license = {text = "MIT"}
@@ -33,10 +33,10 @@ dependencies = [
     "tqdm>=4.65",
     "click>=8.1",
     "scikit-image>=0.21",
+    "torch>=2.0",
 ]
 
 [project.optional-dependencies]
-gpu = ["torch>=2.0"]
 dev = ["pytest>=7.4", "pytest-cov", "black", "ruff", "mypy"]
 viz = ["matplotlib>=3.7"]
 

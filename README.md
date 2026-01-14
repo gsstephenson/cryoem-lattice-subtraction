@@ -39,7 +39,33 @@ When imaging 2D crystal samples in cryo-EM, the periodic lattice produces strong
 
 ## Installation
 
-### From Source (Recommended)
+### From PyPI (Recommended)
+
+```bash
+pip install lattice-sub
+```
+
+This installs the package with all dependencies including PyTorch with CUDA support.
+
+### GPU Support
+
+**Good news: GPU acceleration usually works automatically!** PyTorch 2.5+ bundles CUDA libraries, so most users don't need any extra setup.
+
+Verify your GPU is detected:
+
+```bash
+python -c "import torch; print(f'GPU: {torch.cuda.get_device_name(0)}' if torch.cuda.is_available() else 'CPU only')"
+```
+
+If you see your GPU name, you're all set! If not, you can try:
+
+```bash
+lattice-sub setup-gpu
+```
+
+This command will either confirm your GPU is already working, or help install the correct PyTorch CUDA wheels for older setups.
+
+### From Source (Development)
 
 ```bash
 # Clone the repository
@@ -50,14 +76,11 @@ cd cryoem-lattice-subtraction
 conda create -n lattice_sub python=3.11 -y
 conda activate lattice_sub
 
-# Install core dependencies
-pip install numpy scipy mrcfile pyyaml tqdm click scikit-image matplotlib pytest
-
-# Install PyTorch with CUDA 12.4 support (for GPU acceleration)
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-
 # Install the package in development mode
 pip install -e .
+
+# Enable GPU (one-time)
+lattice-sub setup-gpu
 ```
 
 ### Verify GPU Support
@@ -165,11 +188,10 @@ All 12 tests should pass.
 # Activate the environment
 conda activate lattice_sub
 
-# Process with GPU acceleration
+# Process (GPU used automatically if available)
 lattice-sub process /path/to/18Dec27_SP_pos4_0411.mrc \
     -o output_subtracted.mrc \
     --pixel-size 0.56 \
-    --gpu \
     -v
 ```
 
@@ -281,17 +303,20 @@ result.save("output.mrc")
 ### Command Line
 
 ```bash
-# Process a single file with GPU acceleration
-lattice-sub process input.mrc -o output.mrc --pixel-size 0.56 --gpu
+# Process a single file (GPU used automatically if available)
+lattice-sub process input.mrc -o output.mrc --pixel-size 0.56
 
-# Process without GPU (CPU only)
-lattice-sub process input.mrc -o output.mrc --pixel-size 0.56 --no-gpu
+# Force CPU processing
+lattice-sub process input.mrc -o output.mrc --pixel-size 0.56 --cpu
 
-# Batch process a directory (8 parallel workers)
-lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56 -j 8
+# Batch process a directory (GPU - single worker is optimal)
+lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56
 
 # Batch process with automatic visualization generation
 lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56 --vis viz_dir/
+
+# CPU batch with parallel workers (only useful with --cpu flag)
+lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56 --cpu -j 8
 
 # Generate visualizations for existing processed files
 lattice-sub visualize input_dir/ output_dir/ viz_dir/
@@ -310,7 +335,7 @@ inside_radius_ang: 90
 outside_radius_ang: null  # Auto-calculated
 expand_pixel: 10
 unit_cell_ang: 116  # Nucleosome repeat distance
-backend: pytorch    # "numpy" for CPU, "pytorch" for GPU
+backend: auto       # "auto" (default), "numpy" for CPU, "pytorch" for GPU
 ```
 
 ```bash
@@ -378,21 +403,22 @@ Input Image → Pad → FFT → Detect Peaks → Create Mask → Inpaint → iFF
 | `outside_radius_ang` | auto | Resolution limit for edge protection (Å) |
 | `expand_pixel` | 10 | Morphological expansion of peak mask |
 | `unit_cell_ang` | 116 | Crystal unit cell for shift calculation (Å) |
-| `backend` | numpy | Computation backend: "numpy" (CPU) or "pytorch" (GPU) |
+| `backend` | auto | Computation backend: "auto", "numpy" (CPU) or "pytorch" (GPU) |
 
 ## GPU Acceleration
 
-Enable GPU processing for significant speedup on large images:
+GPU is used automatically when available. After running `lattice-sub setup-gpu`, the tool will detect and use your GPU:
 
 ```python
-config = Config(pixel_ang=0.56, backend="pytorch")
+config = Config(pixel_ang=0.56)  # backend="auto" by default
 subtractor = LatticeSubtractor(config)
+# Output: ✓ Using GPU: NVIDIA GeForce RTX 3090
 ```
 
-Or via command line:
+Or force CPU via command line:
 
 ```bash
-lattice-sub process input.mrc -o output.mrc --pixel-size 0.56 --gpu
+lattice-sub process input.mrc -o output.mrc --pixel-size 0.56 --cpu
 ```
 
 ### Supported Hardware
@@ -568,11 +594,11 @@ threshold: 1.42
 inside_radius_ang: 90
 expand_pixel: 10
 unit_cell_ang: 116
-backend: pytorch
+backend: auto
 EOF
 
-# Process with new tool
-lattice-sub process input.mrc -o output.mrc --config params.yaml --gpu
+# Process with new tool (GPU auto-detected)
+lattice-sub process input.mrc -o output.mrc --config params.yaml
 ```
 
 ---

@@ -37,7 +37,8 @@ BANNER = r"""
           \/                   \/    \/               \/          \/ 
 """
 
-VERSION = "1.0.0"
+# Import version from package to keep it in sync
+from . import __version__ as VERSION
 
 
 def is_interactive() -> bool:

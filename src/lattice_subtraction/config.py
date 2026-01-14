@@ -55,8 +55,8 @@ class Config:
     # Crystal parameters
     unit_cell_ang: float = 116.0  # Nucleosome repeat distance
     
-    # Computation backend
-    backend: Literal["numpy", "pytorch"] = "numpy"
+    # Computation backend: 'auto' tries GPU first, then falls back to CPU
+    backend: Literal["numpy", "pytorch", "auto"] = "auto"
     
     def __post_init__(self):
         """Validate and set auto-calculated parameters."""

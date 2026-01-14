@@ -9,6 +9,8 @@ or used in a pipeline, decorative output is automatically suppressed.
 """
 
 import logging
+import re
+import subprocess
 import sys
 from os import cpu_count as import_cpu_count
 from pathlib import Path
@@ -22,6 +24,86 @@ from .batch import BatchProcessor
 from .visualization import generate_visualizations, save_comparison_visualization
 from .ui import get_ui, get_gpu_name
 from .io import read_mrc
+
+
+# CUDA version to PyTorch index URL mapping
+# Note: PyTorch 2.5+ bundles CUDA 12.x by default, so explicit CUDA wheels
+# are often not needed. This mapping is for cases where reinstallation helps.
+CUDA_INDEX_URLS = {
+    "11.8": "https://download.pytorch.org/whl/cu118",
+    "12.1": "https://download.pytorch.org/whl/cu121",
+    "12.4": "https://download.pytorch.org/whl/cu124",  # Tested
+    "12.6": "https://download.pytorch.org/whl/cu126",
+    "12.8": "https://download.pytorch.org/whl/cu128",
+}
+
+# CUDA versions that can use newer wheel versions (backward compatible)
+CUDA_FALLBACK = {
+    "13.0": "12.8",
+    "13.1": "12.8",
+    "13.2": "12.8",
+}
+
+RECOMMENDED_CUDA = "12.8"
+
+
+def detect_cuda_version() -> Optional[str]:
+    """Detect CUDA version from nvidia-smi output.
+    
+    Returns:
+        CUDA version string (e.g., "12.4") or None if not available.
+    """
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return None
+        
+        # Get CUDA version from nvidia-smi
+        result = subprocess.run(
+            ["nvidia-smi"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        # Parse "CUDA Version: 12.4" from output
+        match = re.search(r"CUDA Version:\s*(\d+\.\d+)", result.stdout)
+        if match:
+            return match.group(1)
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        pass
+    return None
+
+
+def get_pytorch_index_url(cuda_version: str) -> Optional[str]:
+    """Get PyTorch index URL for a CUDA version.
+    
+    Args:
+        cuda_version: CUDA version string (e.g., "12.4")
+        
+    Returns:
+        PyTorch index URL or None if version not supported.
+    """
+    # Try exact match first
+    if cuda_version in CUDA_INDEX_URLS:
+        return CUDA_INDEX_URLS[cuda_version]
+    
+    # Check fallback for newer CUDA versions (backward compatible)
+    if cuda_version in CUDA_FALLBACK:
+        fallback = CUDA_FALLBACK[cuda_version]
+        return CUDA_INDEX_URLS.get(fallback)
+    
+    # Try major.minor prefix match for minor version differences
+    major_minor = ".".join(cuda_version.split(".")[:2])
+    for version, url in CUDA_INDEX_URLS.items():
+        if major_minor == ".".join(version.split(".")[:2]):
+            return url
+    
+    return None
 
 
 # Setup logging - minimal format when interactive UI is active
@@ -41,7 +123,7 @@ def setup_logging(verbose: bool, interactive: bool = False) -> None:
 
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="lattice-sub")
+@click.version_option(version="1.0.3", prog_name="lattice-sub")
 def main():
     """
     Lattice Subtraction for Cryo-EM Micrographs.
@@ -49,21 +131,30 @@ def main():
     Remove periodic crystal lattice signals from micrographs to reveal
     non-periodic features like defects, particles, or molecular tags.
     
-    When running interactively, displays a styled terminal interface
-    with ASCII banner and colored progress output. Use --quiet to
-    suppress decorative output, or pipe output to automatically
-    disable the interactive interface.
+    GPU acceleration works automatically with PyTorch 2.5+. No setup needed!
+    Use 'lattice-sub setup-gpu' to verify GPU status or troubleshoot.
+    
+    \b
+    Quick Start:
+        pip install lattice-sub
+        lattice-sub process input.mrc -o output.mrc -p 0.56
     
     \b
     Examples:
-        # Process single file with GPU
-        lattice-sub process input.mrc -o output.mrc --pixel-size 0.56 --gpu
+        # Process single file (auto GPU detection)
+        lattice-sub process input.mrc -o output.mrc --pixel-size 0.56
         
-        # Batch process directory (8 parallel workers)
-        lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56 -j 8
+        # Force CPU processing
+        lattice-sub process input.mrc -o output.mrc -p 0.56 --cpu
+        
+        # Batch process directory (GPU handles parallelism)
+        lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56
         
         # Batch with visualizations
         lattice-sub batch input_dir/ output_dir/ -p 0.56 --vis viz_dir/
+        
+        # CPU batch with parallel workers (use -j only with --cpu)
+        lattice-sub batch input_dir/ output_dir/ -p 0.56 --cpu -j 8
         
         # Generate visualizations for existing files
         lattice-sub visualize input_dir/ output_dir/ viz_dir/
@@ -75,6 +166,135 @@ def main():
         lattice-sub process input.mrc -o output.mrc -p 0.56 --quiet
     """
     pass
+
+
+@main.command("setup-gpu")
+@click.option(
+    "-y", "--yes",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force reinstall even if GPU is already working",
+)
+def setup_gpu(yes: bool, force: bool):
+    """
+    One-time GPU setup - installs PyTorch with CUDA support.
+    
+    Detects your CUDA version and installs the appropriate PyTorch
+    wheels for GPU acceleration. You only need to run this once.
+    
+    Note: PyTorch 2.5+ often bundles CUDA support by default. This
+    command will first check if your GPU is already working.
+    
+    \b
+    Example:
+        lattice-sub setup-gpu       # Interactive
+        lattice-sub setup-gpu -y    # Skip confirmation
+        lattice-sub setup-gpu --force  # Reinstall even if working
+    """
+    # First, check if GPU is already working
+    click.echo("\nChecking current GPU status...")
+    try:
+        import torch
+        if torch.cuda.is_available() and not force:
+            gpu_name = torch.cuda.get_device_name(0)
+            click.echo(f"\n✓ GPU already enabled: {gpu_name}")
+            click.echo(f"  PyTorch version: {torch.__version__}")
+            click.echo("\n  No setup needed! Your GPU is ready to use.")
+            click.echo("  Use --force to reinstall anyway.")
+            sys.exit(0)
+        elif torch.cuda.is_available() and force:
+            gpu_name = torch.cuda.get_device_name(0)
+            click.echo(f"\n  GPU currently working: {gpu_name}")
+            click.echo("  Proceeding with reinstall due to --force...")
+    except ImportError:
+        click.echo("  PyTorch not installed, proceeding with setup...")
+    except Exception as e:
+        click.echo(f"  Could not check GPU: {e}")
+    
+    click.echo("\nDetecting CUDA version...", nl=False)
+    
+    cuda_version = detect_cuda_version()
+    
+    if cuda_version is None:
+        click.echo(" not found")
+        click.echo("\n✗ No NVIDIA GPU detected.")
+        click.echo("  Make sure nvidia-smi works and NVIDIA drivers are installed.")
+        click.echo("  The package will run on CPU without GPU setup.")
+        sys.exit(1)
+    
+    click.echo(f" found CUDA {cuda_version}")
+    
+    # Check for fallback version
+    effective_version = CUDA_FALLBACK.get(cuda_version, cuda_version)
+    if effective_version != cuda_version:
+        click.echo(f"  (Using CUDA {effective_version} wheels - backward compatible)")
+    
+    index_url = get_pytorch_index_url(cuda_version)
+    if index_url is None:
+        supported = ", ".join(sorted(CUDA_INDEX_URLS.keys()))
+        click.echo(f"\n✗ CUDA {cuda_version} is not supported.")
+        click.echo(f"  Supported versions: {supported}")
+        click.echo("\n  However, your GPU may already work with the bundled CUDA.")
+        click.echo("  Try running: python -c \"import torch; print(torch.cuda.is_available())\"")
+        sys.exit(1)
+    
+    # Build pip command
+    pip_cmd = f"pip install torch --index-url {index_url} --force-reinstall"
+    
+    # Show what will happen
+    click.echo(f"\nThis will install PyTorch with GPU support:")
+    click.echo(f"  {pip_cmd}")
+    
+    if effective_version in ["12.4", "12.6", "12.8"]:
+        click.echo(f"\n✓ CUDA {cuda_version} is well supported")
+    else:
+        click.echo(f"\nNote: CUDA 12.x is recommended, but {cuda_version} should work")
+    
+    click.echo("\nThis is a one-time setup. You won't need to run this again.")
+    
+    # Confirm unless --yes
+    if not yes:
+        if not click.confirm("\nProceed?", default=True):
+            click.echo("Cancelled.")
+            sys.exit(0)
+    
+    # Run pip install
+    click.echo("\nInstalling PyTorch with CUDA support...")
+    
+    try:
+        result = subprocess.run(
+            pip_cmd.split(),
+            check=True,
+            capture_output=False,
+        )
+    except subprocess.CalledProcessError as e:
+        click.echo(f"\n✗ Installation failed with exit code {e.returncode}")
+        click.echo("  Try running the pip command manually:")
+        click.echo(f"  {pip_cmd}")
+        sys.exit(1)
+    
+    # Verify installation
+    click.echo("\nVerifying GPU access...")
+    try:
+        import importlib
+        import torch
+        importlib.reload(torch)  # Reload in case it was imported before
+        
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            click.echo(f"\n✓ GPU enabled: {gpu_name}")
+            click.echo("\nYou can now use lattice-sub with automatic GPU acceleration!")
+        else:
+            click.echo("\n⚠ PyTorch installed but CUDA not available.")
+            click.echo("  This may require a Python restart. Try:")
+            click.echo("  python -c \"import torch; print(torch.cuda.is_available())\"")
+    except ImportError:
+        click.echo("\n⚠ Could not verify - restart Python and check manually:")
+        click.echo("  python -c \"import torch; print(torch.cuda.is_available())\"")
 
 
 @main.command()
@@ -114,9 +334,9 @@ def main():
     help="Path to YAML config file (overrides other options)",
 )
 @click.option(
-    "--gpu/--no-gpu",
-    default=False,
-    help="Use GPU acceleration (requires PyTorch+CUDA). Default: CPU",
+    "--cpu",
+    is_flag=True,
+    help="Force CPU processing (disable GPU auto-detection)",
 )
 @click.option(
     "--diagnostics/--no-diagnostics",
@@ -141,7 +361,7 @@ def process(
     inside_radius: float,
     outside_radius: Optional[float],
     config: Optional[str],
-    gpu: bool,
+    cpu: bool,
     diagnostics: bool,
     verbose: bool,
     quiet: bool,
@@ -176,11 +396,11 @@ def process(
             threshold=threshold,
             inside_radius_ang=inside_radius,
             outside_radius_ang=outside_radius,
-            backend="pytorch" if gpu else "numpy",
+            backend="numpy" if cpu else "auto",
         )
     
     # Print configuration
-    gpu_name = get_gpu_name() if gpu else None
+    gpu_name = get_gpu_name() if not cpu else None
     ui.print_config(cfg.pixel_ang, cfg.threshold, cfg.backend, gpu_name)
     ui.start_timer()
     
@@ -259,7 +479,7 @@ def process(
     "-j", "--jobs",
     type=int,
     default=None,
-    help="Number of parallel workers. Default: CPU count - 1",
+    help="Number of parallel workers. Default: 1 for GPU, CPU count - 1 for --cpu mode",
 )
 @click.option(
     "--config", "-c",
@@ -288,9 +508,9 @@ def process(
     help="Suppress decorative output (banner, colors)",
 )
 @click.option(
-    "--gpu/--no-gpu",
-    default=False,
-    help="Use GPU acceleration (requires PyTorch+CUDA). Default: CPU",
+    "--cpu",
+    is_flag=True,
+    help="Force CPU processing (disable GPU auto-detection)",
 )
 def batch(
     input_dir: str,
@@ -305,7 +525,7 @@ def batch(
     vis: Optional[str],
     verbose: bool,
     quiet: bool,
-    gpu: bool,
+    cpu: bool,
 ):
     """
     Batch process a directory of micrographs.
@@ -328,7 +548,7 @@ def batch(
         cfg = Config(
             pixel_ang=pixel_size,
             threshold=threshold,
-            backend="pytorch" if gpu else "numpy",
+            backend="numpy" if cpu else "auto",
         )
     
     # Count files first
@@ -339,10 +559,17 @@ def batch(
         files = list(input_path.glob(pattern))
     
     num_files = len(files)
-    num_workers = jobs or max(1, (import_cpu_count() or 4) - 1)
+    # For GPU: single worker is optimal (GPU handles parallelism)
+    # For CPU: use multiple workers to parallelize across cores
+    if jobs is not None:
+        num_workers = jobs
+    elif cpu:
+        num_workers = max(1, (import_cpu_count() or 4) - 1)
+    else:
+        num_workers = 1  # GPU mode: single worker is optimal
     
     # Print configuration
-    gpu_name = get_gpu_name() if gpu else None
+    gpu_name = get_gpu_name() if not cpu else None
     ui.print_config(cfg.pixel_ang, cfg.threshold, cfg.backend, gpu_name)
     ui.print_batch_header(num_files, output_dir, num_workers)
     ui.start_timer()

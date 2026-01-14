@@ -76,8 +76,32 @@ class LatticeSubtractor:
         self._setup_backend()
     
     def _setup_backend(self) -> None:
-        """Setup computation backend (numpy or pytorch)."""
-        if self.config.backend == "pytorch":
+        """Setup computation backend (numpy, pytorch, or auto).
+        
+        Auto mode tries PyTorch+CUDA first, then PyTorch CPU, then NumPy.
+        Prints user-friendly status message about which backend is active.
+        """
+        backend = self.config.backend
+        
+        # Auto mode: try GPU first, then CPU
+        if backend == "auto":
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    self.device = torch.device('cuda')
+                    self.use_gpu = True
+                    gpu_name = torch.cuda.get_device_name(0)
+                    print(f"✓ Using GPU: {gpu_name}")
+                else:
+                    self.device = torch.device('cpu')
+                    self.use_gpu = False
+                    print("ℹ Running on CPU (run 'lattice-sub setup-gpu' to enable GPU)")
+            except ImportError:
+                self.device = None
+                self.use_gpu = False
+                print("ℹ Running on CPU with NumPy (PyTorch not installed)")
+        
+        elif backend == "pytorch":
             try:
                 import torch
                 if torch.cuda.is_available():
@@ -94,11 +118,12 @@ class LatticeSubtractor:
                 import warnings
                 warnings.warn(
                     "PyTorch not available, falling back to NumPy. "
-                    "Install with: conda install pytorch pytorch-cuda=13.0 -c pytorch -c nvidia"
+                    "Install with: pip install torch"
                 )
                 self.device = None
                 self.use_gpu = False
         else:
+            # numpy backend
             self.device = None
             self.use_gpu = False
     

@@ -169,7 +169,14 @@ class BatchProcessor:
         failed_files = []
         
         # Check if using GPU - if so, process sequentially to avoid CUDA fork issues
+        # With "auto" backend, check if PyTorch + CUDA is actually available
         use_gpu = self.config.backend == "pytorch"
+        if self.config.backend == "auto":
+            try:
+                import torch
+                use_gpu = torch.cuda.is_available()
+            except ImportError:
+                use_gpu = False
         
         if use_gpu:
             # Sequential processing for GPU (CUDA doesn't support fork multiprocessing)
