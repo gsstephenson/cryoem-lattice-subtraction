@@ -83,17 +83,22 @@ lattice-sub batch raw/ processed/ -p 0.56 --cpu -j 8
 
 ---
 
-## Using a Config File
+## Using a Config File (Optional)
 
-For reproducible processing, save your parameters in a YAML file:
+For most users, the defaults work great — just use `-p` for pixel size:
+
+```bash
+lattice-sub batch input/ output/ -p 0.56
+```
+
+Config files are useful for **reproducibility** or **non-standard samples**:
 
 ```yaml
-# params.yaml
+# params.yaml - only include what you want to override
 pixel_ang: 0.56
-threshold: auto  # Or specify a fixed value like 1.42
-inside_radius_ang: 90
-unit_cell_ang: 116
-use_kornia: true  # GPU-accelerated background subtraction
+unit_cell_ang: 120      # Default: 116 (nucleosome). Change for other crystals.
+inside_radius_ang: 80   # Default: 90. Protect different resolution range.
+# threshold: 1.45       # Uncomment to override auto-optimization
 ```
 
 Then use it:
