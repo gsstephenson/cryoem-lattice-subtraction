@@ -27,6 +27,8 @@ pip install lattice-sub
 
 That's it! GPU acceleration works automatically if you have an NVIDIA GPU.
 
+> **Note:** Requires Python 3.11+ and an NVIDIA GPU (RTX 20/30/40 series, A100, etc.) for best performance. CPU fallback is available but slower.
+
 ---
 
 ## Quick Start
@@ -36,6 +38,8 @@ That's it! GPU acceleration works automatically if you have an NVIDIA GPU.
 ```bash
 lattice-sub process your_image.mrc -o output.mrc --pixel-size 0.56
 ```
+
+> **Pixel size:** Use your detector's actual pixel size (e.g., K3=0.56Å, Falcon=1.14Å, K2=1.32Å)
 
 ### Process a Folder of Images
 
