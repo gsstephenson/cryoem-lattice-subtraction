@@ -26,6 +26,11 @@ from .config import Config
 from .core import LatticeSubtractor
 from .batch import BatchProcessor
 from .io import read_mrc, write_mrc
+from .threshold_optimizer import (
+    ThresholdOptimizer,
+    OptimizationResult,
+    find_optimal_threshold,
+)
 from .visualization import (
     generate_visualizations,
     save_comparison_visualization,
@@ -45,5 +50,8 @@ __all__ = [
     "TerminalUI",
     "get_ui",
     "is_interactive",
+    "ThresholdOptimizer",
+    "OptimizationResult",
+    "find_optimal_threshold",
     "__version__",
 ]

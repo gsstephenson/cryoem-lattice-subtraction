@@ -106,3 +106,13 @@ Thumbs.db
 *.tif
 *.tiff
 !test_data/*.mrc
+
+# Benchmark scripts and outputs (development only)
+benchmark_*.py
+test_search_strategies.py
+benchmark_visualizations/
+kornia_benchmark_visualizations/
+
+# Temporary test outputs
+test_output/
+test_output_gpu/

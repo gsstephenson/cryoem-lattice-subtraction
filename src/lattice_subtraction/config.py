@@ -7,7 +7,7 @@ from YAML configuration files or Python dictionaries.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Optional, Literal, Union
 import yaml
 
 
@@ -44,7 +44,8 @@ class Config:
     outside_radius_ang: Optional[float] = None  # Auto-calculated if None
     
     # Peak detection
-    threshold: float = 1.42
+    # Can be a float (fixed threshold) or "auto" for per-image optimization
+    threshold: Union[float, Literal["auto"]] = 1.42
     expand_pixel: int = 10
     
     # Padding
@@ -66,8 +67,10 @@ class Config:
         if self.inside_radius_ang <= 0:
             raise ValueError(f"inside_radius_ang must be positive, got {self.inside_radius_ang}")
             
-        if self.threshold <= 0:
-            raise ValueError(f"threshold must be positive, got {self.threshold}")
+        # Validate threshold - can be float > 0 or "auto"
+        if self.threshold != "auto":
+            if not isinstance(self.threshold, (int, float)) or self.threshold <= 0:
+                raise ValueError(f"threshold must be positive number or 'auto', got {self.threshold}")
         
         # Auto-calculate outside radius if not provided
         if self.outside_radius_ang is None:
@@ -155,6 +158,11 @@ class Config:
                         params[name_map[name]] = value
         
         return cls(**params)
+    
+    @property
+    def is_adaptive(self) -> bool:
+        """Return True if threshold is set to 'auto' for per-image optimization."""
+        return self.threshold == "auto"
     
     def to_yaml(self, path: str | Path) -> None:
         """

@@ -32,11 +32,13 @@ class SubtractionResult:
         original_shape: Shape of input image before padding
         fft_mask: The mask used for FFT filtering (optional)
         power_spectrum: Background-subtracted power spectrum (optional)
+        threshold_used: The threshold value used (useful when threshold="auto")
     """
     image: np.ndarray
     original_shape: tuple
     fft_mask: Optional[np.ndarray] = None
     power_spectrum: Optional[np.ndarray] = None
+    threshold_used: Optional[float] = None
     
     def save(self, path: str | Path, pixel_size: float = 1.0) -> None:
         """Save the processed image to an MRC file."""
@@ -171,6 +173,15 @@ class LatticeSubtractor:
         
         original_shape = image.shape
         
+        # Determine threshold - compute adaptively if "auto"
+        if self.config.is_adaptive:
+            from .threshold_optimizer import ThresholdOptimizer
+            optimizer = ThresholdOptimizer(self.config, use_gpu=self.use_gpu)
+            opt_result = optimizer.find_optimal(image)
+            threshold_value = opt_result.threshold
+        else:
+            threshold_value = self.config.threshold
+        
         # Pad image
         padded, pad_meta = pad_image(
             image,
@@ -180,6 +191,7 @@ class LatticeSubtractor:
         # Process
         result_padded, fft_mask, power_spec = self._process_padded(
             padded, 
+            threshold=threshold_value,
             return_diagnostics=return_diagnostics,
         )
         
@@ -194,17 +206,24 @@ class LatticeSubtractor:
             original_shape=original_shape,
             fft_mask=fft_mask if return_diagnostics else None,
             power_spectrum=power_spec if return_diagnostics else None,
+            threshold_used=threshold_value,
         )
     
     def _process_padded(
         self,
         image: np.ndarray,
+        threshold: float,
         return_diagnostics: bool = False,
     ) -> tuple:
         """
         Core processing on a padded image.
         
         This implements the algorithm from bg_push_by_rot.m.
+        
+        Args:
+            image: Padded image array
+            threshold: Peak detection threshold value
+            return_diagnostics: Whether to return diagnostic arrays
         """
         # Convert to float64 for processing precision
         img = self._to_device(image.astype(np.float64))
@@ -229,8 +248,8 @@ class LatticeSubtractor:
         power_np = self._to_numpy(power_spectrum)
         subtracted = subtract_background(power_np)
         
-        # Step 4: Threshold to detect peaks
-        threshold_mask = subtracted > self.config.threshold
+        # Step 4: Threshold to detect peaks (using passed threshold value)
+        threshold_mask = subtracted > threshold
         
         # Step 5: Create composite mask with radial limits
         # Use GPU-accelerated mask creation when available

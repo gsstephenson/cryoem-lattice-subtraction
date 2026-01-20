@@ -185,5 +185,72 @@ class TestIO:
         np.testing.assert_array_almost_equal(data, loaded, decimal=5)
 
 
+class TestThresholdOptimizer:
+    """Tests for adaptive threshold optimization."""
+    
+    def test_optimizer_creation(self):
+        """Test creating threshold optimizer."""
+        from lattice_subtraction.threshold_optimizer import ThresholdOptimizer
+        from lattice_subtraction.config import Config
+        
+        config = Config(pixel_ang=0.56)
+        optimizer = ThresholdOptimizer(config)
+        
+        assert optimizer.min_threshold == 1.40
+        assert optimizer.max_threshold == 1.60
+        assert optimizer.tolerance == 0.005
+    
+    def test_find_optimal(self):
+        """Test finding optimal threshold on synthetic data."""
+        from lattice_subtraction.threshold_optimizer import ThresholdOptimizer
+        from lattice_subtraction.config import Config
+        
+        config = Config(pixel_ang=1.0)
+        optimizer = ThresholdOptimizer(config, use_gpu=False)
+        
+        # Create synthetic image with lattice pattern
+        np.random.seed(42)
+        img = np.random.randn(256, 256).astype(np.float32)
+        y, x = np.ogrid[:256, :256]
+        lattice = np.sin(2 * np.pi * x / 20) + np.sin(2 * np.pi * y / 20)
+        img += lattice.astype(np.float32) * 5
+        
+        result = optimizer.find_optimal(img)
+        
+        # Should find a threshold in valid range
+        assert 1.40 <= result.threshold <= 1.60
+        assert result.quality_score >= 0
+        assert result.iterations > 0
+        assert result.peak_count >= 0
+    
+    def test_config_auto_threshold(self):
+        """Test Config with threshold='auto'."""
+        from lattice_subtraction.config import Config
+        
+        config = Config(pixel_ang=0.56, threshold="auto")
+        assert config.is_adaptive == True
+        assert config.threshold == "auto"
+        
+        config_fixed = Config(pixel_ang=0.56, threshold=1.50)
+        assert config_fixed.is_adaptive == False
+        assert config_fixed.threshold == 1.50
+    
+    def test_convenience_function(self):
+        """Test find_optimal_threshold convenience function."""
+        from lattice_subtraction.threshold_optimizer import find_optimal_threshold
+        from lattice_subtraction.config import Config
+        
+        config = Config(pixel_ang=1.0)
+        
+        # Create simple test image
+        np.random.seed(42)
+        img = np.random.randn(128, 128).astype(np.float32)
+        
+        threshold = find_optimal_threshold(img, config)
+        
+        assert isinstance(threshold, float)
+        assert 1.40 <= threshold <= 1.60
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
