@@ -15,7 +15,7 @@
 
 **Remove periodic lattice patterns from cryo-EM micrographs to reveal non-periodic features.**
 
-![Example Result](docs/images/example_comparison.png)
+![Example Result](https://raw.githubusercontent.com/gsstephenson/cryoem-lattice-subtraction/main/docs/images/example_comparison.png)
 
 ---
 
@@ -236,7 +236,7 @@ Version 1.1.0 introduces two major optimizations that make the tool both **faste
 
 **Result:** Each image gets its optimal threshold automatically.
 
-![Threshold Distribution Analysis](docs/images/threshold_analysis.png)
+![Threshold Distribution Analysis](https://raw.githubusercontent.com/gsstephenson/cryoem-lattice-subtraction/main/docs/images/threshold_analysis.png)
 
 #### 2. GPU-Accelerated Background Subtraction (Kornia)
 
