@@ -1,7 +1,10 @@
-# Lattice Subtraction - Example Configuration
+# Lattice Subtraction - Example Configuration (v1.1.0)
 # 
 # This file contains all available configuration options.
 # Copy and modify for your specific dataset.
+#
+# NEW in v1.1.0: Auto-threshold and Kornia GPU acceleration are now defaults!
+# Just run `lattice-sub process image.mrc -p 0.56` for optimal results.
 
 # ============================================
 # REQUIRED: Detector/Pixel Size
@@ -16,9 +19,11 @@ pixel_ang: 0.56
 # ============================================
 
 # Threshold for peak detection on log-amplitude FFT
+# Options:
+#   - "auto" (default): Optimizes threshold per image in range [1.40, 1.60]
+#   - A fixed value (e.g., 1.42): Uses same threshold for all images
 # Higher values = more conservative (fewer peaks detected)
-# Typical range: 1.2 - 1.8
-threshold: 1.42
+threshold: auto
 
 # ============================================
 # Resolution Limits (in Angstroms)
@@ -69,3 +74,12 @@ pad_output: false
 # Backend for FFT computation
 # Options: "auto" (default, GPU if available), "numpy" (CPU), or "pytorch" (GPU)
 backend: auto
+
+# ============================================
+# GPU Acceleration (NEW in v1.1.0)
+# ============================================
+
+# Use Kornia for GPU-accelerated background subtraction
+# This provides ~48x speedup over scipy's CPU median filter
+# Set to false to use CPU scipy (for debugging or CPU-only systems)
+use_kornia: true

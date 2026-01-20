@@ -313,8 +313,8 @@ def setup_gpu(yes: bool, force: bool):
 @click.option(
     "--threshold", "-t",
     type=float,
-    default=1.42,
-    help="Peak detection threshold. Default: 1.42",
+    default=None,
+    help="Peak detection threshold. Default: auto (GPU-optimized per-image)",
 )
 @click.option(
     "--inside-radius",
@@ -357,7 +357,7 @@ def process(
     input_file: str,
     output: Optional[str],
     pixel_size: float,
-    threshold: float,
+    threshold: Optional[float],
     inside_radius: float,
     outside_radius: Optional[float],
     config: Optional[str],
@@ -391,9 +391,11 @@ def process(
         logger.info(f"Loading config from {config}")
         cfg = Config.from_yaml(config)
     else:
+        # Use "auto" threshold if not specified (GPU-optimized per-image)
+        thresh_value = threshold if threshold is not None else "auto"
         cfg = Config(
             pixel_ang=pixel_size,
-            threshold=threshold,
+            threshold=thresh_value,
             inside_radius_ang=inside_radius,
             outside_radius_ang=outside_radius,
             backend="numpy" if cpu else "auto",
@@ -460,8 +462,8 @@ def process(
 @click.option(
     "--threshold", "-t",
     type=float,
-    default=1.42,
-    help="Peak detection threshold. Default: 1.42",
+    default=None,
+    help="Peak detection threshold. Default: auto (GPU-optimized per-image)",
 )
 @click.option(
     "--pattern",
@@ -516,7 +518,7 @@ def batch(
     input_dir: str,
     output_dir: str,
     pixel_size: float,
-    threshold: float,
+    threshold: Optional[float],
     pattern: str,
     prefix: str,
     jobs: Optional[int],
@@ -545,9 +547,11 @@ def batch(
     if config:
         cfg = Config.from_yaml(config)
     else:
+        # Use "auto" threshold if not specified (GPU-optimized per-image)
+        thresh_value = threshold if threshold is not None else "auto"
         cfg = Config(
             pixel_ang=pixel_size,
-            threshold=threshold,
+            threshold=thresh_value,
             backend="numpy" if cpu else "auto",
         )
     

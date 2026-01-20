@@ -16,7 +16,8 @@ class TestConfig:
         
         config = Config(pixel_ang=0.56)
         assert config.pixel_ang == 0.56
-        assert config.threshold == 1.42
+        assert config.threshold == "auto"  # New default is adaptive
+        assert config.use_kornia == True   # Kornia enabled by default
         assert config.inside_radius_ang == 90.0
         # Auto-calculated outside radius
         assert config.outside_radius_ang == pytest.approx(0.56 * 2 + 0.2)

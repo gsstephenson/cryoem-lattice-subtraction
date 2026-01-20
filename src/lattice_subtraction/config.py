@@ -45,7 +45,8 @@ class Config:
     
     # Peak detection
     # Can be a float (fixed threshold) or "auto" for per-image optimization
-    threshold: Union[float, Literal["auto"]] = 1.42
+    # Default "auto" uses GPU-accelerated adaptive threshold (recommended)
+    threshold: Union[float, Literal["auto"]] = "auto"
     expand_pixel: int = 10
     
     # Padding
@@ -58,6 +59,10 @@ class Config:
     
     # Computation backend: 'auto' tries GPU first, then falls back to CPU
     backend: Literal["numpy", "pytorch", "auto"] = "auto"
+    
+    # Use Kornia for GPU-accelerated background subtraction (~50x faster)
+    # Enabled by default when GPU is available
+    use_kornia: bool = True
     
     def __post_init__(self):
         """Validate and set auto-calculated parameters."""

@@ -19,7 +19,7 @@ Example:
     >>> result.save("output.mrc")
 """
 
-__version__ = "1.0.10"
+__version__ = "1.1.0"
 __author__ = "George Stephenson & Vignesh Kasinath"
 
 from .config import Config
@@ -36,6 +36,7 @@ from .visualization import (
     save_comparison_visualization,
     create_comparison_figure,
 )
+from .processing import subtract_background_gpu
 from .ui import TerminalUI, get_ui, is_interactive
 
 __all__ = [
@@ -53,5 +54,6 @@ __all__ = [
     "ThresholdOptimizer",
     "OptimizationResult",
     "find_optimal_threshold",
+    "subtract_background_gpu",
     "__version__",
 ]

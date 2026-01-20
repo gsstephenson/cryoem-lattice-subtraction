@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lattice-sub"
-version = "1.0.10"
+version = "1.1.0"
 description = "Lattice subtraction for cryo-EM micrographs - removes periodic crystal signals to reveal non-periodic features"
 readme = "README.md"
 license = {text = "MIT"}
@@ -34,6 +34,7 @@ dependencies = [
     "scikit-image>=0.21",
     "torch>=2.0",
     "matplotlib>=3.7",
+    "kornia>=0.7",
 ]
 
 [project.optional-dependencies]

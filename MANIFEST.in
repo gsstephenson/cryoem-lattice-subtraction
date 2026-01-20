@@ -10,10 +10,21 @@ recursive-include src *.py
 recursive-include examples *.yaml *.yml
 recursive-include docs *.md *.png
 
+# Exclude tests (dev only - available on GitHub)
+prune tests
+
 # Exclude internal/development files
 exclude NOTES_*.md
 exclude *.log
+exclude benchmark_*.py
+exclude test_search_strategies.py
+prune benchmark_visualizations
+prune kornia_benchmark_visualizations
+prune dist
+prune tests/test_output
+prune tests/test_output_gpu
 global-exclude *.pyc
 global-exclude __pycache__
 global-exclude *.egg-info
 global-exclude .git*
+global-exclude .pytest_cache

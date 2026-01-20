@@ -17,6 +17,7 @@ from .processing import (
     pad_image,
     crop_to_original,
     subtract_background,
+    subtract_background_gpu,
     compute_power_spectrum,
     shift_and_average,
 )
@@ -244,9 +245,15 @@ class LatticeSubtractor:
             power_spectrum = np.abs(np.log(np.abs(fft_shifted) + 1e-10))
         
         # Step 3: Background subtraction for peak detection
-        # Move to numpy for scipy operations
-        power_np = self._to_numpy(power_spectrum)
-        subtracted = subtract_background(power_np)
+        # Use Kornia GPU-accelerated version if enabled, otherwise CPU scipy
+        if self.use_gpu and self.config.use_kornia:
+            # Keep power spectrum on GPU, use Kornia for ~50x speedup
+            subtracted_tensor = subtract_background_gpu(power_spectrum)
+            subtracted = self._to_numpy(subtracted_tensor)
+        else:
+            # Move to numpy for scipy operations
+            power_np = self._to_numpy(power_spectrum)
+            subtracted = subtract_background(power_np)
         
         # Step 4: Threshold to detect peaks (using passed threshold value)
         threshold_mask = subtracted > threshold

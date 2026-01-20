@@ -109,6 +109,7 @@ Thumbs.db
 
 # Benchmark scripts and outputs (development only)
 benchmark_*.py
+benchmark_*.log
 test_search_strategies.py
 benchmark_visualizations/
 kornia_benchmark_visualizations/
@@ -116,3 +117,9 @@ kornia_benchmark_visualizations/
 # Temporary test outputs
 test_output/
 test_output_gpu/
+tests/test_output/
+tests/test_output_gpu/
+
+# Build artifacts
+*.whl
+*.tar.gz

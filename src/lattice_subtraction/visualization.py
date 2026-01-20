@@ -15,6 +15,10 @@ import numpy as np
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
 
+# Silence PIL/Pillow debug logging (PNG chunk messages)
+logging.getLogger('PIL').setLevel(logging.WARNING)
+logging.getLogger('PIL.PngImagePlugin').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
