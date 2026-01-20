@@ -227,6 +227,8 @@ Version 1.1.0 introduces two major optimizations that make the tool both **faste
 
 **Result:** Each image gets its optimal threshold automatically.
 
+![Threshold Distribution Analysis](docs/images/threshold_analysis.png)
+
 #### 2. GPU-Accelerated Background Subtraction (Kornia)
 
 **Problem (v1.0.x):** Profiling revealed background subtraction (scipy median filter) consumed **94% of processing time** — not FFT as expected.

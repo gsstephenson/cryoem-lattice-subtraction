@@ -17,6 +17,7 @@ prune tests
 exclude NOTES_*.md
 exclude *.log
 exclude benchmark_*.py
+exclude analyze_thresholds.py
 exclude test_search_strategies.py
 prune benchmark_visualizations
 prune kornia_benchmark_visualizations
