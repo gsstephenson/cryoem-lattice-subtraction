@@ -204,7 +204,7 @@ lattice-sub batch --help
 
 **Original MATLAB algorithm**: Vignesh Kasinath  
 **Python package**: George Stephenson  
-Kasinath Lab, BioFrontiers Institute, University of Colorado Boulder
+Kasinath Lab (Dept of Biochemistry) & BioFrontiers Institute, University of Colorado Boulder
 
 ---
 
