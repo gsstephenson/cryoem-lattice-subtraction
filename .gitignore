@@ -123,3 +123,5 @@ tests/test_output_gpu/
 # Build artifacts
 *.whl
 *.tar.gz
+# Examples directory (user-specific data)
+examples/
