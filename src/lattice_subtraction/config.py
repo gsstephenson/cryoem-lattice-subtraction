@@ -68,6 +68,9 @@ class Config:
     # When using multi-GPU batch processing, this is set automatically per worker
     device_id: Optional[int] = None
     
+    # Internal flag to suppress status messages (used by batch workers)
+    _quiet: bool = False
+    
     def __post_init__(self):
         """Validate and set auto-calculated parameters."""
         if self.pixel_ang <= 0:

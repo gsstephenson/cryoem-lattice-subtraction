@@ -90,14 +90,14 @@ def _gpu_worker(
     # Set this process to use the specific GPU
     torch.cuda.set_device(gpu_id)
     
-    # Reconstruct config with the specific device_id
+    # Reconstruct config with the specific device_id and quiet mode
     config_dict = config_dict.copy()
     config_dict['device_id'] = gpu_id
+    config_dict['_quiet'] = True  # Suppress messages - main process handles this
     config = Config(**config_dict)
     
-    # Suppress individual GPU messages in workers (main process handles messaging)
+    # Create subtractor (messages suppressed via _quiet flag)
     subtractor = LatticeSubtractor(config)
-    subtractor._gpu_message_shown = True  # Suppress per-worker messages
     
     for input_path, output_path in file_pairs:
         try:
@@ -407,11 +407,14 @@ class BatchProcessor:
         total = len(file_pairs)
         num_gpus = len(gpu_ids)
         
-        # Print multi-GPU info
+        # Print multi-GPU info with GPU names
         try:
             import torch
             gpu_names = [torch.cuda.get_device_name(i) for i in gpu_ids]
             print(f"✓ Using {num_gpus} GPUs: {', '.join(f'GPU {i}' for i in gpu_ids)}")
+            print("")
+            for i, name in zip(gpu_ids, gpu_names):
+                print(f"  ✓ GPU {i}: {name}")
         except Exception:
             print(f"✓ Using {num_gpus} GPUs")
         
@@ -442,9 +445,9 @@ class BatchProcessor:
         progress_queue = ctx.Queue()
         error_queue = ctx.Queue()
         
-        # Create progress bar
+        # Create progress bar (after all GPU info printed)
         if show_progress:
-            print("", flush=True)
+            print()  # Blank line for visual separation
             pbar = tqdm(
                 total=total,
                 desc="  Processing",

@@ -89,6 +89,11 @@ class LatticeSubtractor:
         backend = self.config.backend
         self._gpu_message_shown = getattr(self, '_gpu_message_shown', False)
         
+        # Check if quiet mode (suppress messages for batch workers)
+        quiet = getattr(self.config, '_quiet', False)
+        if quiet:
+            self._gpu_message_shown = True
+        
         # Get device ID from config (None means auto-select GPU 0)
         device_id = self.config.device_id if self.config.device_id is not None else 0
         
