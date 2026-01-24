@@ -16,6 +16,7 @@ prune tests
 # Exclude internal/development files
 exclude NOTES_*.md
 exclude *.log
+exclude environment.yml
 exclude benchmark_*.py
 exclude analyze_thresholds.py
 exclude test_search_strategies.py

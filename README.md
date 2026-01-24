@@ -149,6 +149,58 @@ This provides near-linear speedup with additional GPUs.
 
 ---
 
+## HPC Example (CU Boulder Alpine)
+
+Using [Open OnDemand Core Desktop](https://curc.readthedocs.io/en/latest/open_ondemand/core_desktop.html) with 2× RTX 8000 GPUs:
+
+```bash
+# Create environment
+module load anaconda
+conda create -n lattice_test python=3.11 -y
+conda activate lattice_test
+pip install lattice-sub
+
+# Process 100 micrographs
+lattice-sub batch input/ output/ -p 0.56
+```
+
+**Output:**
+```
+Phase-preserving FFT inpainting for cryo-EM  |  v1.2.2
+
+  Configuration
+  -------------
+    Pixel size:  0.56 A
+    Threshold:   auto
+    Backend:     Auto → GPU (Quadro RTX 8000)
+
+  Batch Processing
+  ----------------
+    Files:    100
+    Output:   /projects/user/output
+    Workers:  1
+
+✓ Using 2 GPUs: GPU 0, GPU 1
+
+  ✓ GPU 0: Quadro RTX 8000
+  ✓ GPU 1: Quadro RTX 8000
+
+  Processing: 100%|█████████████████████████| 100/100 [05:12<00:00,  3.13s/file]
+
+  [OK] Batch complete (312.9s)
+```
+
+**100 images processed in ~5 minutes** with automatic multi-GPU distribution.
+
+For compute-focused workloads, use Alpine's [GPU partitions](https://curc.readthedocs.io/en/latest/clusters/alpine/alpine-hardware.html) (A100, L40, MI100):
+
+```bash
+# Request 3 GPUs for 1 hour
+sinteractive --partition=aa100 --gres=gpu:3 --ntasks=16 --nodes=1 --time=01:00:00 --qos=normal
+```
+
+---
+
 ## Python API
 
 ```python
