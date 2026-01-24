@@ -83,21 +83,26 @@ class LatticeSubtractor:
         
         Auto mode tries PyTorch+CUDA first, then PyTorch CPU, then NumPy.
         Prints user-friendly status message about which backend is active.
+        
+        Uses config.device_id if specified for multi-GPU support.
         """
         backend = self.config.backend
         self._gpu_message_shown = getattr(self, '_gpu_message_shown', False)
+        
+        # Get device ID from config (None means auto-select GPU 0)
+        device_id = self.config.device_id if self.config.device_id is not None else 0
         
         # Auto mode: try GPU first, then CPU
         if backend == "auto":
             try:
                 import torch
                 if torch.cuda.is_available():
-                    self.device = torch.device('cuda')
+                    self.device = torch.device(f'cuda:{device_id}')
                     self.use_gpu = True
                     # Only print once per session (batch processing reuses subtractor)
                     if not self._gpu_message_shown:
-                        gpu_name = torch.cuda.get_device_name(0)
-                        print(f"✓ Using GPU: {gpu_name}")
+                        gpu_name = torch.cuda.get_device_name(device_id)
+                        print(f"✓ Using GPU {device_id}: {gpu_name}")
                         self._gpu_message_shown = True
                 else:
                     self.device = torch.device('cpu')
@@ -116,7 +121,7 @@ class LatticeSubtractor:
             try:
                 import torch
                 if torch.cuda.is_available():
-                    self.device = torch.device('cuda')
+                    self.device = torch.device(f'cuda:{device_id}')
                     self.use_gpu = True
                 else:
                     import warnings

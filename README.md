@@ -131,6 +131,24 @@ python -c "import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_av
 
 ---
 
+## Multi-GPU Support
+
+When processing batches on systems with multiple GPUs, files are automatically distributed across all available GPUs for faster processing. No extra flags needed!
+
+```bash
+# Automatically uses all available GPUs
+lattice-sub batch input_folder/ output_folder/ -p 0.56
+```
+
+**Example with 2 GPUs and 100 images:**
+- GPU 0: processes images 1-50
+- GPU 1: processes images 51-100
+- Single progress bar shows combined progress
+
+This provides near-linear speedup with additional GPUs.
+
+---
+
 ## Python API
 
 ```python

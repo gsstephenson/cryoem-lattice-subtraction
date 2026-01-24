@@ -1,12 +1,14 @@
 """
 Batch processing for multiple micrographs.
 
-This module provides parallel processing capabilities for large datasets.
+This module provides parallel processing capabilities for large datasets,
+including automatic multi-GPU support for systems with multiple CUDA devices.
 """
 
 import os
+import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import List, Tuple, Optional, Callable
 import logging
@@ -61,6 +63,91 @@ def _process_single_file(args: tuple) -> Tuple[Path, Optional[str]]:
     
     except Exception as e:
         return (Path(input_path), str(e))
+
+
+def _gpu_worker(
+    gpu_id: int,
+    file_pairs: List[Tuple[str, str]],
+    config_dict: dict,
+    progress_queue: mp.Queue,
+    error_queue: mp.Queue,
+):
+    """
+    Worker function for multi-GPU processing.
+    
+    Each worker processes its assigned files on a specific GPU and reports
+    progress through a shared queue.
+    
+    Args:
+        gpu_id: CUDA device ID to use
+        file_pairs: List of (input_path, output_path) tuples
+        config_dict: Configuration dictionary
+        progress_queue: Queue to report progress (sends 1 for each completed file)
+        error_queue: Queue to report errors (sends (gpu_id, file_path, error_msg))
+    """
+    import torch
+    
+    # Set this process to use the specific GPU
+    torch.cuda.set_device(gpu_id)
+    
+    # Reconstruct config with the specific device_id
+    config_dict = config_dict.copy()
+    config_dict['device_id'] = gpu_id
+    config = Config(**config_dict)
+    
+    # Suppress individual GPU messages in workers (main process handles messaging)
+    subtractor = LatticeSubtractor(config)
+    subtractor._gpu_message_shown = True  # Suppress per-worker messages
+    
+    for input_path, output_path in file_pairs:
+        try:
+            result = subtractor.process(input_path)
+            result.save(output_path, pixel_size=config.pixel_ang)
+            progress_queue.put(1)
+        except Exception as e:
+            error_queue.put((gpu_id, input_path, str(e)))
+            return  # Fail-fast: exit on first error
+
+
+def _check_gpu_memory(device_id: int, image_shape: Tuple[int, int]) -> Tuple[bool, str]:
+    """
+    Check if GPU has sufficient memory for processing.
+    
+    Args:
+        device_id: CUDA device ID
+        image_shape: (height, width) of image
+        
+    Returns:
+        (is_ok, message) - True if sufficient memory, False with warning message
+    """
+    try:
+        import torch
+        free_mem, total_mem = torch.cuda.mem_get_info(device_id)
+        
+        # Estimate memory needed: image + FFT (complex) + masks + overhead
+        # Roughly 16x image size for safe margin (complex FFT, intermediate buffers)
+        image_bytes = image_shape[0] * image_shape[1] * 4  # float32
+        estimated_need = image_bytes * 16
+        
+        if free_mem < estimated_need:
+            return False, (
+                f"GPU {device_id}: {free_mem / 1e9:.1f}GB free, "
+                f"need ~{estimated_need / 1e9:.1f}GB"
+            )
+        return True, ""
+    except Exception as e:
+        return True, ""  # If we can't check, proceed anyway
+
+
+def _get_available_gpus() -> List[int]:
+    """Get list of available CUDA GPU device IDs."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return list(range(torch.cuda.device_count()))
+        return []
+    except ImportError:
+        return []
 
 
 class BatchProcessor:
@@ -157,6 +244,9 @@ class BatchProcessor:
         """
         Process a list of input/output file pairs.
         
+        Automatically uses multi-GPU processing when multiple GPUs are available.
+        Files are distributed evenly across GPUs in chunks.
+        
         Args:
             file_pairs: List of (input_path, output_path) tuples
             show_progress: If True, show progress bar
@@ -168,8 +258,7 @@ class BatchProcessor:
         successful = 0
         failed_files = []
         
-        # Check if using GPU - if so, process sequentially to avoid CUDA fork issues
-        # With "auto" backend, check if PyTorch + CUDA is actually available
+        # Check if using GPU - if so, check for multi-GPU capability
         use_gpu = self.config.backend == "pytorch"
         if self.config.backend == "auto":
             try:
@@ -179,10 +268,19 @@ class BatchProcessor:
                 use_gpu = False
         
         if use_gpu:
-            # Sequential processing for GPU (CUDA doesn't support fork multiprocessing)
-            successful, failed_files = self._process_sequential(
-                file_pairs, show_progress
-            )
+            # Check how many GPUs are available
+            available_gpus = _get_available_gpus()
+            
+            if len(available_gpus) > 1 and total > 1:
+                # Multi-GPU processing
+                successful, failed_files = self._process_multi_gpu(
+                    file_pairs, available_gpus, show_progress
+                )
+            else:
+                # Single GPU - sequential processing
+                successful, failed_files = self._process_sequential(
+                    file_pairs, show_progress
+                )
         else:
             # Parallel processing for CPU
             successful, failed_files = self._process_parallel(
@@ -284,6 +382,156 @@ class BatchProcessor:
         
         return successful, failed_files
     
+    def _process_multi_gpu(
+        self,
+        file_pairs: List[Tuple[Path, Path]],
+        gpu_ids: List[int],
+        show_progress: bool = True,
+    ) -> Tuple[int, List[Tuple[Path, str]]]:
+        """
+        Process files in parallel across multiple GPUs.
+        
+        Files are distributed evenly across GPUs in chunks.
+        Uses spawn-based multiprocessing to avoid CUDA fork issues.
+        
+        Args:
+            file_pairs: List of (input_path, output_path) tuples
+            gpu_ids: List of CUDA device IDs to use
+            show_progress: If True, show unified progress bar
+            
+        Returns:
+            (successful_count, failed_files_list)
+        """
+        import time
+        
+        total = len(file_pairs)
+        num_gpus = len(gpu_ids)
+        
+        # Print multi-GPU info
+        try:
+            import torch
+            gpu_names = [torch.cuda.get_device_name(i) for i in gpu_ids]
+            print(f"✓ Using {num_gpus} GPUs: {', '.join(f'GPU {i}' for i in gpu_ids)}")
+        except Exception:
+            print(f"✓ Using {num_gpus} GPUs")
+        
+        # Check GPU memory on first GPU (assume similar for all)
+        if file_pairs:
+            try:
+                sample_image = read_mrc(file_pairs[0][0])
+                is_ok, msg = _check_gpu_memory(gpu_ids[0], sample_image.shape)
+                if not is_ok:
+                    print(f"⚠ Memory warning: {msg}")
+            except Exception:
+                pass  # Proceed anyway
+        
+        # Distribute files evenly across GPUs (chunked distribution)
+        chunk_size = (total + num_gpus - 1) // num_gpus  # Ceiling division
+        gpu_file_assignments = []
+        
+        for i, gpu_id in enumerate(gpu_ids):
+            start_idx = i * chunk_size
+            end_idx = min(start_idx + chunk_size, total)
+            if start_idx < total:
+                chunk = [(str(inp), str(out)) for inp, out in file_pairs[start_idx:end_idx]]
+                gpu_file_assignments.append((gpu_id, chunk))
+        
+        # Create shared queues for progress and errors
+        # Use 'spawn' context to avoid CUDA fork issues
+        ctx = mp.get_context('spawn')
+        progress_queue = ctx.Queue()
+        error_queue = ctx.Queue()
+        
+        # Create progress bar
+        if show_progress:
+            print("", flush=True)
+            pbar = tqdm(
+                total=total,
+                desc="  Processing",
+                unit="file",
+                ncols=80,
+                leave=True,
+            )
+        else:
+            pbar = None
+        
+        # Start worker processes
+        processes = []
+        for gpu_id, file_chunk in gpu_file_assignments:
+            p = ctx.Process(
+                target=_gpu_worker,
+                args=(gpu_id, file_chunk, self._config_dict, progress_queue, error_queue),
+            )
+            p.start()
+            processes.append(p)
+        
+        # Monitor progress and check for errors
+        successful = 0
+        failed_files = []
+        completed = 0
+        
+        while completed < total:
+            # Check for progress updates (non-blocking with timeout)
+            try:
+                while True:
+                    progress_queue.get(timeout=0.1)
+                    successful += 1
+                    completed += 1
+                    if pbar:
+                        pbar.update(1)
+            except:
+                pass  # Queue empty, continue
+            
+            # Check for errors (non-blocking)
+            try:
+                while True:
+                    gpu_id, file_path, error_msg = error_queue.get_nowait()
+                    failed_files.append((Path(file_path), error_msg))
+                    completed += 1
+                    if pbar:
+                        pbar.update(1)
+                    
+                    # Fail-fast: terminate all workers and report
+                    print(f"\n✗ GPU {gpu_id} failed on {Path(file_path).name}: {error_msg}")
+                    print(f"\nTip: Try a different configuration:")
+                    print(f"  lattice-sub batch <input> <output> -p {self.config.pixel_ang} --cpu -j 8")
+                    
+                    # Terminate all processes
+                    for p in processes:
+                        if p.is_alive():
+                            p.terminate()
+                    
+                    if pbar:
+                        pbar.close()
+                    
+                    return successful, failed_files
+            except:
+                pass  # No errors, continue
+            
+            # Check if all processes have finished
+            all_done = all(not p.is_alive() for p in processes)
+            if all_done:
+                # Drain remaining queue items
+                try:
+                    while True:
+                        progress_queue.get_nowait()
+                        successful += 1
+                        completed += 1
+                        if pbar:
+                            pbar.update(1)
+                except:
+                    pass
+                break
+        
+        # Wait for all processes to finish
+        for p in processes:
+            p.join(timeout=1.0)
+        
+        if pbar:
+            pbar.close()
+        
+        return successful, failed_files
+
     def process_numbered_sequence(
         self,
         input_pattern: str,

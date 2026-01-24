@@ -64,6 +64,10 @@ class Config:
     # Enabled by default when GPU is available
     use_kornia: bool = True
     
+    # GPU device ID for multi-GPU support. None = auto-select (GPU 0 for single-GPU mode)
+    # When using multi-GPU batch processing, this is set automatically per worker
+    device_id: Optional[int] = None
+    
     def __post_init__(self):
         """Validate and set auto-calculated parameters."""
         if self.pixel_ang <= 0:
