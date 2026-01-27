@@ -1,9 +1,9 @@
-# Lattice Subtraction - Example Configuration (v1.1.0)
+# Lattice Subtraction - Example Configuration
 # 
 # This file contains all available configuration options.
 # Copy and modify for your specific dataset.
 #
-# NEW in v1.1.0: Auto-threshold and Kornia GPU acceleration are now defaults!
+# Auto-threshold and Kornia GPU acceleration are defaults.
 # Just run `lattice-sub process image.mrc -p 0.56` for optimal results.
 
 # ============================================

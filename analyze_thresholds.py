@@ -110,7 +110,7 @@ def analyze_thresholds(image_dir: str, num_images: int = 100):
     ax3.legend()
     ax3.grid(alpha=0.3)
     
-    plt.suptitle('v1.1.0 Adaptive Threshold Optimization Analysis', fontsize=16, y=1.02)
+    plt.suptitle('Adaptive Threshold Optimization Analysis', fontsize=16, y=1.02)
     plt.tight_layout()
     
     # Save

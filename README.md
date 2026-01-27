@@ -53,7 +53,17 @@ lattice-sub batch input_folder/ output_folder/ --pixel-size 0.56
 lattice-sub batch input_folder/ output_folder/ --pixel-size 0.56 --vis comparisons/
 ```
 
-This creates side-by-side PNG images showing before/after/difference for each micrograph.
+This creates 4-panel PNG comparison images for each micrograph showing:
+1. **Original** - Input micrograph
+2. **Subtracted** - Lattice-removed result  
+3. **Difference** - What was removed (5x amplified)
+4. **Threshold Curve** - Threshold vs lattice removal efficacy
+
+**Limit the number of visualizations:**
+```bash
+# Generate visualizations for first 10 images only
+lattice-sub batch input_folder/ output_folder/ -p 0.56 --vis comparisons/ -n 10
+```
 
 ---
 
@@ -64,6 +74,8 @@ This creates side-by-side PNG images showing before/after/difference for each mi
 | `-p, --pixel-size` | **Required.** Pixel size in Ångstroms |
 | `-o, --output` | Output file path (default: `sub_<input>`) |
 | `-t, --threshold` | Peak detection sensitivity (default: **auto** - optimized per image) |
+| `--vis DIR` | Generate 4-panel comparison PNGs in DIR |
+| `-n, --num-vis N` | Limit visualizations to first N images |
 | `--cpu` | Force CPU processing (GPU is used by default) |
 | `-q, --quiet` | Hide the banner and progress messages |
 | `-v, --verbose` | Show detailed processing information |
@@ -166,7 +178,7 @@ lattice-sub batch input/ output/ -p 0.56
 
 **Output:**
 ```
-Phase-preserving FFT inpainting for cryo-EM  |  v1.2.2
+Phase-preserving FFT inpainting for cryo-EM  |  v1.3.0
 
   Configuration
   -------------

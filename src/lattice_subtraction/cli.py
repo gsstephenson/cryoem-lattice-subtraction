@@ -153,8 +153,11 @@ def main():
         # Batch process directory (GPU handles parallelism)
         lattice-sub batch input_dir/ output_dir/ --pixel-size 0.56
         
-        # Batch with visualizations
+        # Batch with visualizations (4-panel with threshold curve)
         lattice-sub batch input_dir/ output_dir/ -p 0.56 --vis viz_dir/
+        
+        # Batch with limited visualizations (only first 10)
+        lattice-sub batch input_dir/ output_dir/ -p 0.56 --vis viz_dir/ -n 10
         
         # CPU batch with parallel workers (use -j only with --cpu)
         lattice-sub batch input_dir/ output_dir/ -p 0.56 --cpu -j 8
@@ -503,6 +506,12 @@ def process(
     help="Generate comparison visualizations in this directory",
 )
 @click.option(
+    "-n", "--num-vis",
+    type=int,
+    default=None,
+    help="Number of visualizations to generate (default: all)",
+)
+@click.option(
     "-v", "--verbose",
     is_flag=True,
     help="Enable verbose output",
@@ -528,6 +537,7 @@ def batch(
     config: Optional[str],
     recursive: bool,
     vis: Optional[str],
+    num_vis: Optional[int],
     verbose: bool,
     quiet: bool,
     cpu: bool,
@@ -617,7 +627,8 @@ def batch(
     
     # Generate visualizations if requested
     if vis:
-        logger.info(f"Generating visualizations in: {vis}")
+        limit_msg = f" (limit: {num_vis})" if num_vis else ""
+        logger.info(f"Generating visualizations in: {vis}{limit_msg}")
         viz_success, viz_total = generate_visualizations(
             input_dir=input_dir,
             output_dir=output_dir,
@@ -625,6 +636,8 @@ def batch(
             prefix=prefix,
             pattern=pattern,
             show_progress=True,
+            limit=num_vis,
+            config=cfg,
         )
         logger.info(f"Visualizations: {viz_success}/{viz_total} created")
 
