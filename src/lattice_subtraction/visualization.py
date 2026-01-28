@@ -139,13 +139,15 @@ def create_comparison_figure_with_threshold(
     optimal_threshold: float,
     optimal_quality: float,
     title: str = "Lattice Subtraction Comparison",
-    figsize: Tuple[int, int] = (24, 6),
+    figsize: Tuple[int, int] = (14, 12),
     dpi: int = 150,
 ):
     """
     Create a 4-panel comparison figure with threshold optimization curve.
     
-    Layout: [Original] [Subtracted] [Difference] [Threshold vs Quality]
+    Layout (2x2 grid):
+        [Original]        [Subtracted]
+        [Difference]      [Threshold Curve]
     
     Args:
         original: Original image array
@@ -166,44 +168,44 @@ def create_comparison_figure_with_threshold(
     # Compute difference
     difference = original - processed
     
-    # Create figure with 4 panels (1 row, 4 columns)
-    fig, axes = plt.subplots(1, 4, figsize=figsize)
+    # Create figure with 4 panels (2 rows, 2 columns)
+    fig, axes = plt.subplots(2, 2, figsize=figsize)
     
     # Contrast limits from original
     vmin, vmax = np.percentile(original, [1, 99])
     
-    # Panel 1: Original
-    axes[0].imshow(original, cmap='gray', vmin=vmin, vmax=vmax)
-    axes[0].set_title(f'Original\n{original.shape}')
-    axes[0].axis('off')
+    # Panel 1 (top-left): Original
+    axes[0, 0].imshow(original, cmap='gray', vmin=vmin, vmax=vmax)
+    axes[0, 0].set_title(f'Original\n{original.shape}')
+    axes[0, 0].axis('off')
     
-    # Panel 2: Lattice Subtracted
-    axes[1].imshow(processed, cmap='gray', vmin=vmin, vmax=vmax)
-    axes[1].set_title(f'Lattice Subtracted\n{processed.shape}')
-    axes[1].axis('off')
+    # Panel 2 (top-right): Lattice Subtracted
+    axes[0, 1].imshow(processed, cmap='gray', vmin=vmin, vmax=vmax)
+    axes[0, 1].set_title(f'Lattice Subtracted\n{processed.shape}')
+    axes[0, 1].axis('off')
     
-    # Panel 3: Difference (removed lattice)
+    # Panel 3 (bottom-left): Difference (removed lattice)
     diff_std = np.std(difference)
-    axes[2].imshow(
+    axes[1, 0].imshow(
         difference, 
         cmap='RdBu_r',
         vmin=-diff_std * 3, 
         vmax=diff_std * 3
     )
-    axes[2].set_title('Difference (Removed Lattice)')
-    axes[2].axis('off')
+    axes[1, 0].set_title('Difference (Removed Lattice)')
+    axes[1, 0].axis('off')
     
-    # Panel 4: Threshold vs Quality Score curve
-    axes[3].plot(thresholds, quality_scores, 'b-', linewidth=2, label='Quality Score')
-    axes[3].axvline(x=optimal_threshold, color='r', linestyle='--', linewidth=2, 
+    # Panel 4 (bottom-right): Threshold vs Quality Score curve
+    axes[1, 1].plot(thresholds, quality_scores, 'b-', linewidth=2, label='Quality Score')
+    axes[1, 1].axvline(x=optimal_threshold, color='r', linestyle='--', linewidth=2, 
                     label=f'Optimal: {optimal_threshold:.3f}')
-    axes[3].scatter([optimal_threshold], [optimal_quality], color='r', s=100, zorder=5)
-    axes[3].set_xlabel('Threshold', fontsize=11)
-    axes[3].set_ylabel('Lattice Removal Efficacy', fontsize=11)
-    axes[3].set_title(f'Threshold Optimization\nOptimal = {optimal_threshold:.3f}')
-    axes[3].legend(loc='best', fontsize=9)
-    axes[3].grid(True, alpha=0.3)
-    axes[3].set_xlim(thresholds.min(), thresholds.max())
+    axes[1, 1].scatter([optimal_threshold], [optimal_quality], color='r', s=100, zorder=5)
+    axes[1, 1].set_xlabel('Threshold', fontsize=11)
+    axes[1, 1].set_ylabel('Lattice Removal Efficacy', fontsize=11)
+    axes[1, 1].set_title(f'Threshold Optimization\nOptimal = {optimal_threshold:.3f}')
+    axes[1, 1].legend(loc='best', fontsize=9)
+    axes[1, 1].grid(True, alpha=0.3)
+    axes[1, 1].set_xlim(thresholds.min(), thresholds.max())
     
     # Title
     plt.suptitle(title, fontsize=14)
