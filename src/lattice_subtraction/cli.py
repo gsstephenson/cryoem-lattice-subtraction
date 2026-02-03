@@ -24,6 +24,7 @@ from .batch import BatchProcessor
 from .visualization import generate_visualizations, save_comparison_visualization
 from .ui import get_ui, get_gpu_name
 from .io import read_mrc
+from .watch import LiveBatchProcessor
 
 
 # CUDA version to PyTorch index URL mapping
@@ -526,6 +527,11 @@ def process(
     is_flag=True,
     help="Force CPU processing (disable GPU auto-detection)",
 )
+@click.option(
+    "--live",
+    is_flag=True,
+    help="Watch mode: continuously monitor input directory for new files (Press Ctrl+C to stop)",
+)
 def batch(
     input_dir: str,
     output_dir: str,
@@ -541,6 +547,7 @@ def batch(
     verbose: bool,
     quiet: bool,
     cpu: bool,
+    live: bool,
 ):
     """
     Batch process a directory of micrographs.
@@ -549,6 +556,11 @@ def batch(
     INPUT_DIR: Directory containing input MRC files
     OUTPUT_DIR: Directory for processed output files
     """
+    # Validate options
+    if live and recursive:
+        click.echo("Error: --live and --recursive cannot be used together", err=True)
+        sys.exit(1)
+    
     # Initialize UI
     ui = get_ui(quiet=quiet)
     ui.print_banner()
@@ -568,8 +580,92 @@ def batch(
             backend="numpy" if cpu else "auto",
         )
     
-    # Count files first
+    # Print configuration
+    gpu_name = get_gpu_name() if not cpu else None
+    ui.print_config(cfg.pixel_ang, cfg.threshold, cfg.backend, gpu_name)
+    
     input_path = Path(input_dir)
+    output_path = Path(output_dir)
+    
+    # LIVE WATCH MODE
+    if live:
+        logger.info(f"Starting live watch mode: {input_dir} -> {output_dir}")
+        
+        # Determine number of workers
+        if jobs is not None:
+            num_workers = jobs
+        elif cpu:
+            num_workers = max(1, (import_cpu_count() or 4) - 1)
+        else:
+            # For GPU: use 1 worker per GPU (or 1 if single GPU)
+            try:
+                import torch
+                num_workers = torch.cuda.device_count() if torch.cuda.is_available() else 1
+            except ImportError:
+                num_workers = 1
+        
+        ui.show_watch_startup(str(input_path))
+        ui.start_timer()
+        
+        # Create live processor
+        live_processor = LiveBatchProcessor(
+            config=cfg,
+            output_prefix=prefix,
+            debounce_seconds=2.0,
+        )
+        
+        # Start watching and processing
+        stats = live_processor.watch_and_process(
+            input_dir=input_path,
+            output_dir=output_path,
+            pattern=pattern,
+            ui=ui,
+            num_workers=num_workers,
+        )
+        
+        # Print summary
+        print()  # Extra newline after counter
+        ui.print_summary(processed=stats.total_processed, failed=stats.total_failed)
+        
+        if stats.total_failed > 0:
+            ui.print_warning(f"{stats.total_failed} file(s) failed to process")
+            for file_path, error in stats.failed_files[:5]:
+                ui.print_error(f"{file_path.name}: {error}")
+            if len(stats.failed_files) > 5:
+                ui.print_error(f"... and {len(stats.failed_files) - 5} more failures")
+        
+        logger.info(f"Live mode complete: {stats.total_processed} processed, {stats.total_failed} failed")
+        
+        # Generate visualizations if requested
+        if vis and stats.total_processed > 0:
+            ui.print_info(f"Generating visualizations in: {vis}")
+            limit_msg = f" (first {num_vis})" if num_vis else ""
+            logger.info(f"Generating visualizations{limit_msg}")
+            
+            viz_success, viz_total = generate_visualizations(
+                input_dir=input_dir,
+                output_dir=output_dir,
+                viz_dir=vis,
+                prefix=prefix,
+                pattern=pattern,
+                show_progress=True,
+                limit=num_vis,
+                config=cfg,
+            )
+            logger.info(f"Visualizations: {viz_success}/{viz_total} created")
+        
+        # Exit with error code if any files failed
+        if stats.total_failed > 0:
+            sys.exit(1)
+        
+        return
+    
+    # NORMAL BATCH MODE
+    # Count files first
+    if recursive:
+        files = list(input_path.rglob(pattern))
+    else:
+        files = list(input_path.glob(pattern))
     if recursive:
         files = list(input_path.rglob(pattern))
     else:

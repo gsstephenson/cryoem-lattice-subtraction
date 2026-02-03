@@ -230,6 +230,65 @@ class TerminalUI:
         if not self.interactive:
             return
         print(f"    {self._colorize('|-', Colors.DIM)} Saved: {path}")
+    
+    def show_watch_startup(self, input_dir: str) -> None:
+        """Show live watch mode startup message."""
+        if not self.interactive:
+            return
+        
+        print(self._colorize("  Live Watch Mode", Colors.BOLD))
+        print(self._colorize("  ---------------", Colors.DIM))
+        print(f"    Watching: {input_dir}")
+        print(f"    {self._colorize('Press Ctrl+C to stop watching and finalize', Colors.YELLOW)}")
+        print()
+    
+    def show_watch_stopped(self) -> None:
+        """Show message when watching is stopped."""
+        if not self.interactive:
+            return
+        print()  # New line after counter
+        print(f"  {self._colorize('[STOPPED]', Colors.YELLOW)} Watch mode stopped")
+        print()
+    
+    def show_live_counter_header(self) -> None:
+        """Show header for live counter display."""
+        if not self.interactive:
+            return
+        # No header needed - counter updates in place
+        pass
+    
+    def update_live_counter(self, count: int, avg_time: float, latest: str) -> None:
+        """
+        Update the live processing counter in place.
+        
+        Args:
+            count: Number of files processed
+            avg_time: Average processing time per file
+            latest: Name of most recently processed file
+        """
+        if not self.interactive:
+            return
+        
+        # Format time display
+        if avg_time > 0:
+            time_str = f"{avg_time:.1f}s/file"
+        else:
+            time_str = "--s/file"
+        
+        # Truncate filename if too long
+        max_filename_len = 40
+        if len(latest) > max_filename_len:
+            latest = "..." + latest[-(max_filename_len-3):]
+        
+        # Build counter line
+        counter = f"  Processed: {self._colorize(str(count), Colors.GREEN)} files"
+        avg = f"Avg: {self._colorize(time_str, Colors.CYAN)}"
+        file_info = f"Latest: {latest}"
+        
+        line = f"{counter} | {avg} | {file_info}"
+        
+        # Print with carriage return to overwrite previous line
+        print(f"\r{line}", end="", flush=True)
 
 
 def get_ui(quiet: bool = False) -> TerminalUI:

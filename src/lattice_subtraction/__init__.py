@@ -38,10 +38,12 @@ from .visualization import (
 )
 from .processing import subtract_background_gpu
 from .ui import TerminalUI, get_ui, is_interactive
+from .watch import LiveBatchProcessor, LiveStats
 
 __all__ = [
     "LatticeSubtractor",
-    "BatchProcessor", 
+    "BatchProcessor",
+    "LiveBatchProcessor",
     "Config",
     "read_mrc",
     "write_mrc",
@@ -55,5 +57,6 @@ __all__ = [
     "OptimizationResult",
     "find_optimal_threshold",
     "subtract_background_gpu",
+    "LiveStats",
     "__version__",
 ]

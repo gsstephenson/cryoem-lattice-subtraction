@@ -35,6 +35,7 @@ dependencies = [
     "torch>=2.0",
     "matplotlib>=3.7",
     "kornia>=0.7",
+    "watchdog>=3.0",
 ]
 
 [project.optional-dependencies]
