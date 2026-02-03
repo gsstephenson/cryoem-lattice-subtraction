@@ -407,16 +407,17 @@ class BatchProcessor:
         total = len(file_pairs)
         num_gpus = len(gpu_ids)
         
-        # Print multi-GPU info with GPU names
+        # Get UI instance for consistent messaging
+        from .ui import get_ui
+        ui = get_ui(quiet=self.config._quiet)
+        
+        # Print multi-GPU info with GPU names ONCE
         try:
             import torch
             gpu_names = [torch.cuda.get_device_name(i) for i in gpu_ids]
-            print(f"✓ Using {num_gpus} GPUs: {', '.join(f'GPU {i}' for i in gpu_ids)}")
-            print("")
-            for i, name in zip(gpu_ids, gpu_names):
-                print(f"  ✓ GPU {i}: {name}")
+            ui.print_gpu_status(gpu_ids, gpu_names)
         except Exception:
-            print(f"✓ Using {num_gpus} GPUs")
+            pass
         
         # Check GPU memory on first GPU (assume similar for all)
         if file_pairs:

@@ -330,6 +330,16 @@ class LiveBatchProcessor:
         # Determine GPU setup for workers
         device_ids = self._get_worker_devices(num_workers)
         
+        # Print GPU status once at startup
+        if device_ids and device_ids[0] is not None:
+            try:
+                import torch
+                unique_gpus = list(set(d for d in device_ids if d is not None))
+                gpu_names = [torch.cuda.get_device_name(i) for i in unique_gpus]
+                ui.print_gpu_status(unique_gpus, gpu_names)
+            except Exception:
+                pass
+        
         # Start processing workers
         self._running = True
         for i, device_id in enumerate(device_ids):

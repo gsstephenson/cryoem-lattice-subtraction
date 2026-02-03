@@ -11,7 +11,7 @@ suppressed to avoid polluting downstream processing.
 
 import sys
 import time
-from typing import Optional
+from typing import Optional, List
 
 
 class Colors:
@@ -289,6 +289,22 @@ class TerminalUI:
         
         # Print with carriage return to overwrite previous line
         print(f"\r{line}", end="", flush=True)
+    
+    def print_gpu_status(self, gpu_ids: List[int], gpu_names: List[str]) -> None:
+        """
+        Print initial GPU status display.
+        
+        Args:
+            gpu_ids: List of GPU device IDs
+            gpu_names: List of GPU names
+        """
+        if not self.interactive:
+            return
+        
+        print()
+        for gpu_id, name in zip(gpu_ids, gpu_names):
+            print(f"  {self._colorize('✓', Colors.GREEN)} GPU {gpu_id}: {name}")
+        print()
 
 
 def get_ui(quiet: bool = False) -> TerminalUI:
