@@ -225,8 +225,11 @@ class LiveBatchProcessor:
             ui: Terminal UI for displaying progress
             device_id: Optional GPU device ID (for multi-GPU)
         """
-        # Create subtractor for this worker
-        subtractor = self._create_subtractor(device_id)
+        # Set CUDA device for this thread if GPU is being used
+        if device_id is not None:
+            import torch
+            torch.cuda.set_device(device_id)
+            logger.debug(f"Worker initialized on GPU {device_id}")
         
         while self._running:
             try:
@@ -234,6 +237,9 @@ class LiveBatchProcessor:
                 file_path = self.file_queue.get(timeout=0.5)
             except Empty:
                 continue
+            
+            # Create subtractor on-demand for each file to avoid memory buildup
+            subtractor = self._create_subtractor(device_id)
             
             # Process the file
             output_name = f"{self.output_prefix}{file_path.name}"
@@ -258,7 +264,7 @@ class LiveBatchProcessor:
                     latest=file_path.name,
                 )
                 
-                logger.info(f"Processed: {file_path.name} ({processing_time:.2f}s)")
+                logger.info(f"Processed: {file_path.name} ({processing_time:.2f}s) on GPU {device_id if device_id is not None else 'CPU'}")
             
             except Exception as e:
                 with self._lock:
@@ -268,6 +274,12 @@ class LiveBatchProcessor:
                 logger.error(f"Failed to process {file_path.name}: {e}")
             
             finally:
+                # Clean up memory after each file in live mode
+                del subtractor
+                if device_id is not None:
+                    import torch
+                    torch.cuda.empty_cache()
+                
                 self.file_queue.task_done()
     
     def watch_and_process(

@@ -86,13 +86,13 @@ def main():
         "--min-delay",
         type=float,
         default=2.0,
-        help="Minimum delay between files in seconds (default: 2.0)"
+        help="Minimum delay between files in seconds (default: 2.0, use 0.5 for stress test)"
     )
     parser.add_argument(
         "--max-delay",
         type=float,
         default=10.0,
-        help="Maximum delay between files in seconds (default: 10.0)"
+        help="Maximum delay between files in seconds (default: 10.0, use 2.0 for stress test)"
     )
     parser.add_argument(
         "-n", "--num-files",

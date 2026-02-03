@@ -592,17 +592,12 @@ def batch(
         logger.info(f"Starting live watch mode: {input_dir} -> {output_dir}")
         
         # Determine number of workers
+        # For live mode, default to 1 worker to avoid GPU memory issues
+        # Files typically arrive one at a time, so parallel processing isn't needed
         if jobs is not None:
             num_workers = jobs
-        elif cpu:
-            num_workers = max(1, (import_cpu_count() or 4) - 1)
         else:
-            # For GPU: use 1 worker per GPU (or 1 if single GPU)
-            try:
-                import torch
-                num_workers = torch.cuda.device_count() if torch.cuda.is_available() else 1
-            except ImportError:
-                num_workers = 1
+            num_workers = 1  # Single worker is optimal for live mode
         
         ui.show_watch_startup(str(input_path))
         ui.start_timer()
