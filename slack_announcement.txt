@@ -1,0 +1,45 @@
+lattice-sub v1.5.3 Released — Live Watch Mode is Here!
+
+Hi everyone,
+
+The live processing feature I've been working on is now available on PyPI.
+
+What's New in v1.5.x
+
+Live Watch Mode with --live Flag
+• Continuously monitors input directory for new files as they arrive
+• Hybrid approach: batch processes existing files with all GPUs first, then switches to single-GPU watch mode for new arrivals
+• Clean real-time counter updates in place
+  (e.g. "Processed: 105/105 files | Avg: 0.3s/file | Latest: filename.mrc")
+• File debouncing handles partial writes (2 second delay)
+• Press Ctrl+C for graceful shutdown
+
+Real-World Test (Shenron — 4× RTX 2080 Ti)
+• 100 existing files batch processed in ~2 minutes 48 seconds
+• 5 files added during batch processing automatically queued
+• All 105 files processed correctly with accurate counter display
+• Watch mode processes new files as they appear (~0.3s per file)
+
+Perfect For
+• Processing motion-corrected files during overnight data collection
+• Real-time monitoring of lattice subtraction results
+• Automated pipelines that need to keep pace with upstream processing
+
+Upgrade
+pip install --upgrade lattice-sub
+
+Usage
+Standard batch (unchanged):
+lattice-sub batch input/ output/ -p 0.56
+
+NEW live watch mode:
+lattice-sub batch input/ output/ -p 0.56 --live
+
+Links
+• PyPI: https://pypi.org/project/lattice-sub/
+• GitHub: https://github.com/gsstephenson/cryoem-lattice-subtraction
+• Changelog: https://github.com/gsstephenson/cryoem-lattice-subtraction/blob/main/CHANGELOG.md
+
+For those running data collection sessions, this should eliminate the need to manually re-run batch processing as new files arrive. Let me know how it works for your workflows.
+
+Go forth and subtract (continuously).

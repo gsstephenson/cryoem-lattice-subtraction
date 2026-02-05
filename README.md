@@ -15,6 +15,8 @@
 
 **Remove periodic lattice patterns from cryo-EM micrographs to reveal non-periodic features.**
 
+> **NEW in v1.5.0:** Live watch mode with `--live` flag! Automatically process motion-corrected files as they arrive during data collection.
+
 ![Example Result](https://raw.githubusercontent.com/gsstephenson/cryoem-lattice-subtraction/main/docs/images/example_comparison.png)
 
 ---
@@ -47,6 +49,20 @@ lattice-sub process your_image.mrc -o output.mrc --pixel-size 0.56
 lattice-sub batch input_folder/ output_folder/ --pixel-size 0.56
 ```
 
+### Live Watch Mode (NEW in v1.5.0)
+
+Process files as they arrive during data collection:
+
+```bash
+lattice-sub batch input_folder/ output_folder/ --pixel-size 0.56 --live
+```
+
+In live mode:
+- If files already exist: batch processes them first with all GPUs
+- Then switches to watch mode: monitors for new files with single GPU
+- Press Ctrl+C to stop watching
+- Perfect for processing motion-corrected files as they're generated
+
 ### Generate Comparison Images
 
 ```bash
@@ -76,6 +92,7 @@ lattice-sub batch input_folder/ output_folder/ -p 0.56 --vis comparisons/ -n 10
 | `-t, --threshold` | Peak detection sensitivity (default: **auto** - optimized per image) |
 | `--vis DIR` | Generate 4-panel comparison PNGs in DIR |
 | `-n, --num-vis N` | Limit visualizations to first N images |
+| `--live` | **Watch mode**: continuously monitor directory for new files (Ctrl+C to stop) |
 | `--cpu` | Force CPU processing (GPU is used by default) |
 | `-q, --quiet` | Hide the banner and progress messages |
 | `-v, --verbose` | Show detailed processing information |
@@ -150,6 +167,9 @@ When processing batches on systems with multiple GPUs, files are automatically d
 ```bash
 # Automatically uses all available GPUs
 lattice-sub batch input_folder/ output_folder/ -p 0.56
+
+# Or watch for new files in real-time (live mode)
+lattice-sub batch input_folder/ output_folder/ -p 0.56 --live
 ```
 
 **Example with 2 GPUs and 100 images:**
@@ -178,7 +198,7 @@ lattice-sub batch input/ output/ -p 0.56
 
 **Output:**
 ```
-Phase-preserving FFT inpainting for cryo-EM  |  v1.3.0
+Phase-preserving FFT inpainting for cryo-EM  |  v1.5.3
 
   Configuration
   -------------
@@ -236,6 +256,23 @@ processor = BatchProcessor(config)
 
 stats = processor.process_directory("raw/", "processed/")
 print(f"Processed {stats.successful}/{stats.total} files")
+```
+
+### Live Watch Mode
+
+```python
+from lattice_subtraction import LiveBatchProcessor, Config
+
+config = Config(pixel_ang=0.56)
+processor = LiveBatchProcessor(
+    input_dir="raw/",
+    output_dir="processed/",
+    config=config,
+    num_workers=1
+)
+
+# Process existing files, then watch for new ones
+processor.watch_and_process()  # Runs until Ctrl+C
 ```
 
 ---
@@ -408,6 +445,7 @@ src/lattice_subtraction/
 ├── cli.py                # Command-line interface
 ├── core.py               # LatticeSubtractor main class
 ├── batch.py              # Parallel batch processing
+├── watch.py              # Live watch mode (NEW in v1.5.0)
 ├── config.py             # Configuration dataclass
 ├── io.py                 # MRC file I/O
 ├── masks.py              # FFT mask generation

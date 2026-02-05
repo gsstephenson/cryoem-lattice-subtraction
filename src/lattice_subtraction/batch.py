@@ -272,6 +272,19 @@ class BatchProcessor:
             available_gpus = _get_available_gpus()
             
             if len(available_gpus) > 1 and total > 1:
+                # Print GPU list
+                try:
+                    import torch
+                    from .ui import get_ui, Colors
+                    ui = get_ui(quiet=self.config._quiet)
+                    print()
+                    for gpu_id in available_gpus:
+                        gpu_name = torch.cuda.get_device_name(gpu_id)
+                        print(f"  {ui._colorize('✓', Colors.GREEN)} GPU {gpu_id}: {gpu_name}")
+                    print()
+                except Exception:
+                    pass
+                
                 # Multi-GPU processing
                 successful, failed_files = self._process_multi_gpu(
                     file_pairs, available_gpus, show_progress
@@ -406,18 +419,6 @@ class BatchProcessor:
         
         total = len(file_pairs)
         num_gpus = len(gpu_ids)
-        
-        # Get UI instance for consistent messaging
-        from .ui import get_ui
-        ui = get_ui(quiet=self.config._quiet)
-        
-        # Print multi-GPU info with GPU names ONCE
-        try:
-            import torch
-            gpu_names = [torch.cuda.get_device_name(i) for i in gpu_ids]
-            ui.print_gpu_status(gpu_ids, gpu_names)
-        except Exception:
-            pass
         
         # Check GPU memory on first GPU (assume similar for all)
         if file_pairs:

@@ -70,6 +70,7 @@ class MRCFileHandler(FileSystemEventHandler):
         pattern: str,
         file_queue: Queue,
         processed_files: Set[Path],
+        processor: 'LiveBatchProcessor',
         debounce_seconds: float = 2.0,
     ):
         """
@@ -79,12 +80,14 @@ class MRCFileHandler(FileSystemEventHandler):
             pattern: Glob pattern for matching files (e.g., "*.mrc")
             file_queue: Queue to add detected files to
             processed_files: Set of already processed file paths
+            processor: Parent LiveBatchProcessor for updating totals
             debounce_seconds: Time to wait after last modification before processing
         """
         super().__init__()
         self.pattern = pattern
         self.file_queue = file_queue
         self.processed_files = processed_files
+        self.processor = processor
         self.debounce_seconds = debounce_seconds
         
         # Track file modification times for debouncing
@@ -127,6 +130,9 @@ class MRCFileHandler(FileSystemEventHandler):
                 if file_path not in self.processed_files and file_path.exists():
                     logger.debug(f"Queueing stable file: {file_path}")
                     self.file_queue.put(file_path)
+                    # Increment total count when new file is queued
+                    with self.processor._lock:
+                        self.processor.total_files += 1
     
     def on_created(self, event: FileSystemEvent):
         """Handle file creation events."""
@@ -190,6 +196,7 @@ class LiveBatchProcessor:
         self.file_queue: Queue = Queue()
         self.processed_files: Set[Path] = set()
         self.stats = LiveStats()
+        self.total_files: int = 0  # Total files in input directory
         
         # Worker threads
         self._workers: List[threading.Thread] = []
@@ -208,6 +215,9 @@ class LiveBatchProcessor:
             config = replace(self.config, device_id=device_id)
         else:
             config = self.config
+        
+        # Enable quiet mode to suppress GPU messages on each file
+        config._quiet = True
         
         return LatticeSubtractor(config)
     
@@ -260,11 +270,12 @@ class LiveBatchProcessor:
                 # Update UI counter
                 ui.update_live_counter(
                     count=self.stats.total_processed,
+                    total=self.total_files,
                     avg_time=self.stats.average_time,
                     latest=file_path.name,
                 )
                 
-                logger.info(f"Processed: {file_path.name} ({processing_time:.2f}s) on GPU {device_id if device_id is not None else 'CPU'}")
+                # Don't log to console in live mode - it breaks the in-place counter update
             
             except Exception as e:
                 with self._lock:
@@ -308,18 +319,65 @@ class LiveBatchProcessor:
         # Create output directory
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Check for existing files in directory and process them
-        existing_files = list(input_dir.glob(pattern))
-        if existing_files:
-            ui.print_info(f"Found {len(existing_files)} existing files in {input_dir}")
-            for file_path in existing_files:
-                self.file_queue.put(file_path)
+        # Check for existing files in directory
+        all_files = list(input_dir.glob(pattern))
+        
+        # If files already exist, process them with batch mode first (multi-GPU)
+        if all_files:
+            from .batch import BatchProcessor
+            
+            ui.print_info(f"Found {len(all_files)} existing files - processing with batch mode first")
+            
+            # Create file pairs for batch processing
+            file_pairs = []
+            for file_path in all_files:
+                output_name = f"{self.output_prefix}{file_path.name}"
+                output_path = output_dir / output_name
+                file_pairs.append((file_path, output_path))
+                self.processed_files.add(file_path)  # Mark as processed
+            
+            # Process with BatchProcessor (will use multi-GPU if available)
+            batch_processor = BatchProcessor(
+                config=self.config,
+                num_workers=num_workers,
+                output_prefix="",  # Already included in output paths
+            )
+            
+            result = batch_processor.process_directory(
+                input_dir=input_dir,
+                output_dir=output_dir,
+                pattern=pattern,
+                recursive=False,
+                show_progress=True,
+            )
+            
+            # Update stats with batch results
+            self.stats.total_processed = result.successful
+            self.stats.total_failed = result.failed
+            self.total_files = len(all_files)  # Set initial total
+            
+            ui.print_info(f"Batch processing complete: {result.successful}/{result.total} files")
+            print()
+            
+            # Check if any new files arrived during batch processing
+            current_files = set(input_dir.glob(pattern))
+            new_during_batch = current_files - set(all_files)
+            if new_during_batch:
+                ui.print_info(f"Found {len(new_during_batch)} files added during batch processing - queueing now")
+                for file_path in new_during_batch:
+                    if file_path not in self.processed_files:
+                        self.file_queue.put(file_path)
+                        self.total_files += 1  # Increment total for each new file
+        else:
+            # No existing files, start fresh
+            self.total_files = 0
         
         # Setup file system watcher
         self.handler = MRCFileHandler(
             pattern=pattern,
             file_queue=self.file_queue,
             processed_files=self.processed_files,
+            processor=self,
             debounce_seconds=self.debounce_seconds,
         )
         
@@ -330,15 +388,19 @@ class LiveBatchProcessor:
         # Determine GPU setup for workers
         device_ids = self._get_worker_devices(num_workers)
         
-        # Print GPU status once at startup
+        # Print GPU list at startup (non-dynamic, just info)
         if device_ids and device_ids[0] is not None:
             try:
                 import torch
-                unique_gpus = list(set(d for d in device_ids if d is not None))
-                gpu_names = [torch.cuda.get_device_name(i) for i in unique_gpus]
-                ui.print_gpu_status(unique_gpus, gpu_names)
-            except Exception:
-                pass
+                from .ui import Colors
+                unique_gpus = sorted(set(d for d in device_ids if d is not None))
+                print()
+                for gpu_id in unique_gpus:
+                    gpu_name = torch.cuda.get_device_name(gpu_id)
+                    print(f"  {ui._colorize('✓', Colors.GREEN)} GPU {gpu_id}: {gpu_name}")
+                print()
+            except Exception as e:
+                pass  # Silently skip if GPU info unavailable
         
         # Start processing workers
         self._running = True
@@ -353,7 +415,7 @@ class LiveBatchProcessor:
         
         # Show initial counter
         ui.show_live_counter_header()
-        ui.update_live_counter(count=0, avg_time=0.0, latest="waiting...")
+        ui.update_live_counter(count=0, total=self.total_files, avg_time=0.0, latest="waiting...")
         
         # Wait for interrupt
         try:

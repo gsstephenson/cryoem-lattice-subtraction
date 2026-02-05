@@ -257,12 +257,13 @@ class TerminalUI:
         # No header needed - counter updates in place
         pass
     
-    def update_live_counter(self, count: int, avg_time: float, latest: str) -> None:
+    def update_live_counter(self, count: int, total: int, avg_time: float, latest: str) -> None:
         """
         Update the live processing counter in place.
         
         Args:
             count: Number of files processed
+            total: Total number of files in input directory
             avg_time: Average processing time per file
             latest: Name of most recently processed file
         """
@@ -280,8 +281,9 @@ class TerminalUI:
         if len(latest) > max_filename_len:
             latest = "..." + latest[-(max_filename_len-3):]
         
-        # Build counter line
-        counter = f"  Processed: {self._colorize(str(count), Colors.GREEN)} files"
+        # Build counter line with X/Y format
+        count_str = f"{self._colorize(str(count), Colors.GREEN)}/{total}"
+        counter = f"  Processed: {count_str} files"
         avg = f"Avg: {self._colorize(time_str, Colors.CYAN)}"
         file_info = f"Latest: {latest}"
         
@@ -289,22 +291,6 @@ class TerminalUI:
         
         # Print with carriage return to overwrite previous line
         print(f"\r{line}", end="", flush=True)
-    
-    def print_gpu_status(self, gpu_ids: List[int], gpu_names: List[str]) -> None:
-        """
-        Print initial GPU status display.
-        
-        Args:
-            gpu_ids: List of GPU device IDs
-            gpu_names: List of GPU names
-        """
-        if not self.interactive:
-            return
-        
-        print()
-        for gpu_id, name in zip(gpu_ids, gpu_names):
-            print(f"  {self._colorize('✓', Colors.GREEN)} GPU {gpu_id}: {name}")
-        print()
 
 
 def get_ui(quiet: bool = False) -> TerminalUI:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lattice-sub"
-version = "1.4.2"
+version = "1.5.4"
 description = "Lattice subtraction for cryo-EM micrographs - removes periodic crystal signals to reveal non-periodic features"
 readme = "README.md"
 license = {text = "MIT"}
@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
-keywords = ["cryo-em", "electron-microscopy", "lattice-subtraction", "image-processing", "fft"]
+keywords = ["cryo-em", "electron-microscopy", "lattice-subtraction", "image-processing", "fft", "live-processing", "file-watching"]
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.11",

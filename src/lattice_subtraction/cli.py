@@ -313,9 +313,9 @@ def setup_gpu(yes: bool, force: bool):
 )
 @click.option(
     "--pixel-size", "-p",
-    type=float,
-    required=True,
-    help="Pixel size in Angstroms",
+    type=click.FloatRange(min=0.0, min_open=True),
+    required=False,
+    help="Pixel size in Angstroms (must be positive). Required unless --config provides pixel_ang.",
 )
 @click.option(
     "--threshold", "-t",
@@ -397,7 +397,23 @@ def process(
     if config:
         logger.info(f"Loading config from {config}")
         cfg = Config.from_yaml(config)
+        # Override with command-line options if provided
+        if pixel_size is not None:
+            cfg.pixel_ang = pixel_size
+        if threshold is not None:
+            cfg.threshold = threshold
+        if inside_radius != 90.0:  # Non-default value
+            cfg.inside_radius_ang = inside_radius
+        if outside_radius is not None:
+            cfg.outside_radius_ang = outside_radius
+        if cpu:
+            cfg.backend = "numpy"
     else:
+        # No config file - pixel_size is required
+        if pixel_size is None:
+            raise click.UsageError(
+                "--pixel-size is required when --config is not provided"
+            )
         # Use "auto" threshold if not specified (GPU-optimized per-image)
         thresh_value = threshold if threshold is not None else "auto"
         cfg = Config(
@@ -462,9 +478,9 @@ def process(
 @click.argument("output_dir", type=click.Path(file_okay=False))
 @click.option(
     "--pixel-size", "-p",
-    type=float,
-    required=True,
-    help="Pixel size in Angstroms",
+    type=click.FloatRange(min=0.0, min_open=True),
+    required=False,
+    help="Pixel size in Angstroms (must be positive). Required unless --config provides pixel_ang.",
 )
 @click.option(
     "--threshold", "-t",
@@ -571,7 +587,19 @@ def batch(
     # Load or create config
     if config:
         cfg = Config.from_yaml(config)
+        # Override with command-line options if provided
+        if pixel_size is not None:
+            cfg.pixel_ang = pixel_size
+        if threshold is not None:
+            cfg.threshold = threshold
+        if cpu:
+            cfg.backend = "numpy"
     else:
+        # No config file - pixel_size is required
+        if pixel_size is None:
+            raise click.UsageError(
+                "--pixel-size is required when --config is not provided"
+            )
         # Use "auto" threshold if not specified (GPU-optimized per-image)
         thresh_value = threshold if threshold is not None else "auto"
         cfg = Config(
