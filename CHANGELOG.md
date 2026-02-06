@@ -5,6 +5,13 @@ All notable changes to lattice-sub will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] - 2026-02-06
+
+### Added
+- New `--suffix` option to filter files by suffix in batch/live mode
+  - Example: `--suffix doseweighted.mrc` processes only `*doseweighted.mrc` files
+  - Output uses standard naming (`sub_filename.mrc`)
+
 ## [1.5.4] - 2026-02-05
 
 ### Fixed

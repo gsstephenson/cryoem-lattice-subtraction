@@ -63,6 +63,11 @@ In live mode:
 - Press Ctrl+C to stop watching
 - Perfect for processing motion-corrected files as they're generated
 
+**Filter by suffix** (e.g., only dose-weighted micrographs):
+```bash
+lattice-sub batch input_folder/ output_folder/ -p 0.56 --live --suffix doseweighted.mrc
+```
+
 ### Generate Comparison Images
 
 ```bash
@@ -93,6 +98,7 @@ lattice-sub batch input_folder/ output_folder/ -p 0.56 --vis comparisons/ -n 10
 | `--vis DIR` | Generate 4-panel comparison PNGs in DIR |
 | `-n, --num-vis N` | Limit visualizations to first N images |
 | `--live` | **Watch mode**: continuously monitor directory for new files (Ctrl+C to stop) |
+| `--suffix TEXT` | Only process files ending with this suffix (e.g., `doseweighted.mrc`) |
 | `--cpu` | Force CPU processing (GPU is used by default) |
 | `-q, --quiet` | Hide the banner and progress messages |
 | `-v, --verbose` | Show detailed processing information |

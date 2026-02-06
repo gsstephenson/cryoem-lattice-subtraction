@@ -19,7 +19,7 @@ Example:
     >>> result.save("output.mrc")
 """
 
-__version__ = "1.5.4"
+__version__ = "1.5.5"
 __author__ = "George Stephenson & Vignesh Kasinath"
 
 from .config import Config

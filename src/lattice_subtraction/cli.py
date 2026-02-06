@@ -548,6 +548,12 @@ def process(
     is_flag=True,
     help="Watch mode: continuously monitor input directory for new files (Press Ctrl+C to stop)",
 )
+@click.option(
+    "--suffix",
+    type=str,
+    default=None,
+    help="Only process files ending with this suffix (e.g., 'doseweighted.mrc')",
+)
 def batch(
     input_dir: str,
     output_dir: str,
@@ -564,6 +570,7 @@ def batch(
     quiet: bool,
     cpu: bool,
     live: bool,
+    suffix: Optional[str],
 ):
     """
     Batch process a directory of micrographs.
@@ -627,6 +634,12 @@ def batch(
         else:
             num_workers = 1  # Single worker is optimal for live mode
         
+        # If suffix is provided, override pattern to filter by suffix
+        live_pattern = pattern
+        if suffix:
+            live_pattern = f"*{suffix}"
+            ui.print_info(f"Filtering by suffix: *{suffix}")
+        
         ui.show_watch_startup(str(input_path))
         ui.start_timer()
         
@@ -641,7 +654,7 @@ def batch(
         stats = live_processor.watch_and_process(
             input_dir=input_path,
             output_dir=output_path,
-            pattern=pattern,
+            pattern=live_pattern,
             ui=ui,
             num_workers=num_workers,
         )
@@ -684,15 +697,17 @@ def batch(
         return
     
     # NORMAL BATCH MODE
+    # If suffix is provided, override pattern to filter by suffix
+    batch_pattern = pattern
+    if suffix:
+        batch_pattern = f"*{suffix}"
+        ui.print_info(f"Filtering by suffix: *{suffix}")
+    
     # Count files first
     if recursive:
-        files = list(input_path.rglob(pattern))
+        files = list(input_path.rglob(batch_pattern))
     else:
-        files = list(input_path.glob(pattern))
-    if recursive:
-        files = list(input_path.rglob(pattern))
-    else:
-        files = list(input_path.glob(pattern))
+        files = list(input_path.glob(batch_pattern))
     
     num_files = len(files)
     # For GPU: single worker is optimal (GPU handles parallelism)
@@ -711,14 +726,14 @@ def batch(
     ui.start_timer()
     
     logger.info(f"Batch processing: {input_dir} -> {output_dir}")
-    logger.info(f"Pattern: {pattern}, Workers: {jobs or 'auto'}")
+    logger.info(f"Pattern: {batch_pattern}, Workers: {jobs or 'auto'}")
     
     # Process
     processor = BatchProcessor(cfg, num_workers=jobs, output_prefix=prefix)
     result = processor.process_directory(
         input_dir=input_dir,
         output_dir=output_dir,
-        pattern=pattern,
+        pattern=batch_pattern,
         recursive=recursive,
         show_progress=True,  # Always show progress bar
     )

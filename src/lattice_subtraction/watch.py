@@ -251,7 +251,7 @@ class LiveBatchProcessor:
             # Create subtractor on-demand for each file to avoid memory buildup
             subtractor = self._create_subtractor(device_id)
             
-            # Process the file
+            # Determine output filename
             output_name = f"{self.output_prefix}{file_path.name}"
             output_path = output_dir / output_name
             
@@ -332,8 +332,8 @@ class LiveBatchProcessor:
             file_pairs = []
             for file_path in all_files:
                 output_name = f"{self.output_prefix}{file_path.name}"
-                output_path = output_dir / output_name
-                file_pairs.append((file_path, output_path))
+                out_path = output_dir / output_name
+                file_pairs.append((file_path, out_path))
                 self.processed_files.add(file_path)  # Mark as processed
             
             # Process with BatchProcessor (will use multi-GPU if available)
@@ -343,11 +343,8 @@ class LiveBatchProcessor:
                 output_prefix="",  # Already included in output paths
             )
             
-            result = batch_processor.process_directory(
-                input_dir=input_dir,
-                output_dir=output_dir,
-                pattern=pattern,
-                recursive=False,
+            result = batch_processor.process_file_list(
+                file_pairs=file_pairs,
                 show_progress=True,
             )
             
